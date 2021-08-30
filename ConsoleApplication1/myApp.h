@@ -82,6 +82,7 @@ class myApp
 			std::string fullName;
 			size_t		size;
             bool        canRename;
+            bool        isResized;
             int         width;
             int         height;
 		};
@@ -93,11 +94,11 @@ class myApp
         };
 
 	
-		enum DIRS { RESIZE, QUALITY };
+		enum DIRS { RESIZE, QUALITY, RESIZED };
 
 	public:
 
-		myApp(const char* dir) : _dir(dir)
+		myApp(const char* dir) : _dir(dir), _mode(0)
 		{
 			if (_dir.back() != '\\')
 				_dir += "\\";
@@ -105,9 +106,7 @@ class myApp
 			createAuxDirs();
 		}
 
-        void    readFiles();
-        void    renameFiles();
-        void    sortDirs();
+        void process();
 
 static  bool pathValid(std::string dir)
         {
@@ -115,21 +114,41 @@ static  bool pathValid(std::string dir)
             return (dwAttrib != INVALID_FILE_ATTRIBUTES && (dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
         };
 
+static  void extractPath(int argc, char** argv, std::string& path)
+        {
+            // Get path from the argument, if present
+            for (int i = 0; i < argc; i++)
+            {
+                std::string param(argv[i]);
+
+                if (param.substr(0, 6) == "/path=")
+                    path = param.substr(6, param.length());
+            }
+        }
+
 	private:
 
+        void    selectOption    ();
 		void    createAuxDirs   ();
-        void	findDirs        ();
+        void	findDirs        (std::string);
         void	findFiles       (std::string, std::map<std::string, myApp::fileInfo, myCmp> &);
         bool	GetImageSize    (const char*, int&, int&);
         bool	dirExists       (std::string);
         void	mkDir           (std::string);
         void	mvDir           (std::string, std::string, enum DIRS);
+        void    readFiles       (std::string);
+        void    renameFiles     ();
+        void    sortDirs        ();
+        void    checkOnRenamed  ();
 
 	private:
+
+        char        _mode;
 
 		std::string _dir;
 		std::string _dirResize;
 		std::string _dirQuality;
+        std::string _dirResized;
 
         std::map<std::string, dirInfo> _mapDirs;
 };

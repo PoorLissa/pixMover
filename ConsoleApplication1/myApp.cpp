@@ -2,8 +2,95 @@
 
 // -----------------------------------------------------------------------------------------------
 
+void myApp::selectOption()
+{
+	char ch(0);
+
+	std::cout << std::endl;
+	std::cout << " Select option:\n\n";
+	std::cout << " 1. Rearrange directories depending on files size/dimensions (Before the resize)\n";
+	std::cout << " 2. Check the files (After the resize)\n";
+	std::cout << " 3. Restore original file names\n";
+	std::cout << " 0. Exit\n";
+	std::cout << " >> ";
+
+	std::cin >> ch;
+
+	switch (ch)
+	{
+		case '1':
+			_mode = 1;
+			break;
+
+		case '2':
+			_mode = 2;
+			break;
+
+		case '3':
+			_mode = 3;
+			break;
+	}
+
+	return;
+}
+
+// -----------------------------------------------------------------------------------------------
+
+void myApp::process()
+{
+	selectOption();
+
+	switch (_mode)
+	{
+		case 1: {
+
+				// Read file structure and get files info
+				std::cout << " Reading files..." << std::endl;
+				readFiles(_dir);
+
+				// Rename files (optional, will be asked about it)
+				std::cout << " Renaming files..." << std::endl;
+				renameFiles();
+
+				// Move directories
+				std::cout << " Rearranging directories..." << std::endl;
+				sortDirs();
+
+				std::cout << " Done: OK" << std::endl;
+
+			}
+			break;
+
+		case 2: {
+
+				std::cout << " Checking files:" << std::endl;
+				checkOnRenamed();
+
+			}
+			break;
+
+		case 3: {
+
+				std::cout << " Not implemented yet =(" << std::endl;
+
+			}
+			break;
+
+		default:
+			std::cout << " Exiting..." << std::endl;
+	}
+
+	std::cout << " Press any key to contiunue : " << std::endl;
+
+	getchar();
+
+	return;
+}
+
+// -----------------------------------------------------------------------------------------------
+
 // Get list of directories within the directory
-void myApp::findDirs()
+void myApp::findDirs(std::string dir)
 {
 	WIN32_FIND_DATA ffd;
 	TCHAR szDir[MAX_PATH];
@@ -11,7 +98,7 @@ void myApp::findDirs()
 
 	bool error(false);
 	_mapDirs.clear();
-	std::string Dir = _dir + "*.*";
+	std::string Dir = dir + "*.*";
 
 	for (size_t i = 0; i < Dir.length(); i++)
 	{
@@ -28,7 +115,7 @@ void myApp::findDirs()
 			if ( ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY )
 			{
 				size_t i = 0;
-				std::string name(""), fullName(_dir);
+				std::string name(""), fullName(dir);
 
 				while (ffd.cFileName[i] != '\0')
 				{
@@ -135,11 +222,15 @@ void myApp::findFiles(std::string dir, std::map<std::string, myApp::fileInfo, my
 						size = buf.st_size;
 					}
 
+					size_t pos = name.find_last_of('.');
+
 					// Remember the name
 					fileInfo inf;
-					inf.fullName = fullName;
-					inf.size = size;
+					inf.fullName  = fullName;
+					inf.size	  = size;
 					inf.canRename = true;
+					inf.isResized = (name.substr(pos - 2u, 3u) == ".r.");
+
 					map.emplace(name, inf);
 				}
 			}
@@ -303,6 +394,10 @@ void myApp::mvDir(std::string shortName, std::string fullName, enum DIRS d)
 		case DIRS::QUALITY:
 			dest = _dirQuality;
 			break;
+
+		case DIRS::RESIZED:
+			dest = _dirResized;
+			break;
 	}
 
 	dest += shortName;
@@ -316,14 +411,18 @@ void myApp::mvDir(std::string shortName, std::string fullName, enum DIRS d)
 
 void myApp::createAuxDirs()
 {
-	if (!dirExists("[]__do_resize"))
-		mkDir("[]__do_resize");
+	if (!dirExists("[__do_resize]"))
+		mkDir("[__do_resize]");
 
-	if (!dirExists("[]__do_lower_quality"))
-		mkDir("[]__do_lower_quality");
+	if (!dirExists("[__do_lower_quality]"))
+		mkDir("[__do_lower_quality]");
 
-	_dirResize  = _dir + "[]__do_resize\\";
-	_dirQuality = _dir + "[]__do_lower_quality\\";
+	if (!dirExists("[__files.r]"))
+		mkDir("[__files.r]");
+
+	_dirResize  = _dir + "[__do_resize]\\";
+	_dirQuality = _dir + "[__do_lower_quality]\\";
+	_dirResized = _dir + "[__files.r]\\";
 
 	return;
 }
@@ -399,10 +498,15 @@ void myApp::renameFiles()
 
 		auto mapFiles = &(iter->second.files);
 
+		bool resizedFound = false;
+
 		// Try to find covers first:
 		for (auto it = mapFiles->begin(); it != mapFiles->end(); ++it)
 		{
 			totalSize += it->second.size;
+
+			if (it->second.isResized)
+				resizedFound = true;
 
 			if (it->second.canRename)
 			{
@@ -444,15 +548,18 @@ void myApp::renameFiles()
 			}
 		}
 
-		// For the rest of the files:
-		for (auto it = mapFiles->begin(); it != mapFiles->end(); ++it)
+		if (!resizedFound)
 		{
-			if (it->second.canRename)
+			// For the rest of the files:
+			for (auto it = mapFiles->begin(); it != mapFiles->end(); ++it)
 			{
-				if (option == 'y' || option == 'Y')
+				if (it->second.canRename && !it->second.isResized)
 				{
-					ren(it->second.fullName, getNumericName(++cnt));
-					it->second.canRename = false;
+					if (option == 'y' || option == 'Y')
+					{
+						ren(it->second.fullName, getNumericName(++cnt));
+						it->second.canRename = false;
+					}
 				}
 			}
 		}
@@ -474,9 +581,9 @@ void myApp::renameFiles()
 // -----------------------------------------------------------------------------------------------
 
 // Read info about all the files into map
-void myApp::readFiles()
+void myApp::readFiles(std::string dir)
 {
-	findDirs();
+	findDirs(dir);
 
 	std::cout << " Found " << _mapDirs.size() << " directories:\n" << std::endl;
 
@@ -520,7 +627,7 @@ void myApp::sortDirs()
 		auto mapFiles = &(iter->second.files);
 
 		int maxX(0), maxY(0), x(0), y(0);
-		size_t SizeTotal(0u), SizeQuality(0u), SizeResize(0u), cntResize(0u), cntQuality(0u);
+		size_t SizeTotal(0u), SizeQuality(0u), SizeResize(0u), cntResize(0u), cntQuality(0u), cntResized(0u);
 		float avg = 0.0f;
 
 		// For each file:
@@ -530,32 +637,39 @@ void myApp::sortDirs()
 
 			SizeTotal += *currentSize;
 
-			// Check if the file is larger than 1 Mb:
-			if (*currentSize >= 1024 * 1024)
+			if (it->second.isResized)
 			{
-				SizeQuality += *currentSize;
-				cntQuality++;
+				cntResized++;
 			}
-
-			x = it->second.width;
-			y = it->second.height;
-
-			if (x > maxX)
+			else
 			{
-				maxX = x;
-			}
+				// Check if the file is larger than 1 Mb:
+				if (*currentSize >= 1024 * 1024)
+				{
+					SizeQuality += *currentSize;
+					cntQuality++;
+				}
 
-			if (y > maxY)
-			{
-				maxY = y;
-			}
+				x = it->second.width;
+				y = it->second.height;
 
-			int minSize = x > y ? y : x;
+				if (x > maxX)
+				{
+					maxX = x;
+				}
 
-			if (minSize > THRESHOLD_RESIZE)
-			{
-				SizeResize += *currentSize;
-				cntResize++;
+				if (y > maxY)
+				{
+					maxY = y;
+				}
+
+				int minSize = x > y ? y : x;
+
+				if (minSize > THRESHOLD_RESIZE)
+				{
+					SizeResize += *currentSize;
+					cntResize++;
+				}
 			}
 		}
 
@@ -594,19 +708,221 @@ void myApp::sortDirs()
 
 		std::cout << std::endl;
 
-		if (cntResize)
+		do
 		{
-			mvDir(iter->first, iter->second.fullName, myApp::DIRS::RESIZE);
-		}
-		else
-		{
+			if (cntResized)
+			{
+				mvDir(iter->first, iter->second.fullName, myApp::DIRS::RESIZED);
+				break;
+			}
+
+			if (cntResize)
+			{
+				mvDir(iter->first, iter->second.fullName, myApp::DIRS::RESIZE);
+				break;
+			}
+
 			if (avg * 10 > THRESHOLD_QUALITY)
 			{
 				mvDir(iter->first, iter->second.fullName, myApp::DIRS::QUALITY);
+				break;
+			}
+
+		} while (false);
+	}
+
+	return;
+}
+
+// -----------------------------------------------------------------------------------------------
+
+void myApp::checkOnRenamed()
+{
+	auto isRenamed = [](std::string name) -> bool
+	{
+		size_t pos = name.find_last_of('.');
+
+		if (pos != std::string::npos)
+			return name.substr(pos - 2u, 3u) == ".r.";
+
+		return false;
+	};
+
+	auto isCover = [](std::string name) -> bool
+	{
+		return name.find("cover") != std::string::npos;
+	};
+
+	// ------------------------------------------------------------------------
+
+	std::string data;
+	std::vector<std::string *> vec;
+
+	vec.emplace_back(&_dirQuality);
+	vec.emplace_back(&_dirResize);
+
+	// Read file structure and get files info
+	std::cout << " Reading files..." << std::endl;
+
+	// Upper directories:
+	for (size_t i = 0; i < vec.size(); i++)
+	{
+		readFiles(*vec[i]);
+
+		// Inner directories
+		for (auto iter = _mapDirs.begin(); iter != _mapDirs.end(); ++iter)
+		{
+			auto mapFiles = &(iter->second.files);
+
+			data = " Files NOT resized:\n";
+
+			std::map<std::string, myApp::fileInfo *> m;
+			size_t cnt_original(0u), cnt_resized(0u), size_original(0u), size_resized(0u);
+
+			for (auto it = mapFiles->begin(); it != mapFiles->end(); ++it)
+				m[it->first] = &(it->second);
+
+			// Files
+			for (auto it = m.begin(); it != m.end(); ++it)
+			{
+				std::cout << it->first << std::endl;
+
+				// Leave covers as they are
+				if (isCover(it->first))
+					continue;
+
+				if (!isRenamed(it->first))
+				{
+					cnt_original++;
+
+					std::string str = it->first.substr(0, it->first.find_last_of('.')) + ".r.jpg";
+
+					// This original file has a '.r.jpg' sibling
+					if (m.count(str))
+					{
+						cnt_resized++;
+
+						size_original += it->second->size;
+						size_resized  += m[str]->size;
+					}
+					else
+					{
+						data += "  ";
+						data += it->first;
+						data += '\n';
+					}
+				}
+			}
+
+			data += "\n";
+			data += " Files resized:\n";
+			data += "  Original size : " + std::to_string((float)size_original / 1024 / 1024);
+			data += '\n';
+			data += "  Resized size  : " + std::to_string((float)size_resized / 1024 / 1024);
+			data += '\n';
+
+			std::fstream file;
+
+			file.open(iter->second.fullName + "\\[info].txt", std::fstream::in | std::fstream::app);
+
+			if (file.is_open())
+			{
+				file.write(data.c_str(), data.length());
+				file.close();
 			}
 		}
 	}
 
+	getchar();
+
+
+#if 0
+
+	// For each dir:
+	for (auto iter = _mapDirs.begin(); iter != _mapDirs.end(); ++iter)
+	{
+		size_t cnt_cover(0u), cnt_z_cover(0u), cnt(0u), totalSize(0u);
+
+		auto mapFiles = &(iter->second.files);
+
+		bool resizedFound = false;
+
+		// Try to find covers first:
+		for (auto it = mapFiles->begin(); it != mapFiles->end(); ++it)
+		{
+			totalSize += it->second.size;
+
+			if (it->second.isResized)
+				resizedFound = true;
+
+			if (it->second.canRename)
+			{
+				// cover
+				if (it->first.find("cover") != std::string::npos)
+				{
+					if (it->first.find("clean") != std::string::npos)
+					{
+						ren(it->second.fullName, "z_cover", cnt_z_cover);
+						cnt_z_cover++;
+					}
+					else
+					{
+						ren(it->second.fullName, "_cover", cnt_cover);
+						cnt_cover++;
+					}
+
+					it->second.canRename = false;
+				}
+			}
+		}
+
+		// No cover files were found
+		// Try to find files that are significantly smaller than average file size in this dir:
+		if (cnt_cover + cnt_z_cover == 0u)
+		{
+			float avg = (float)totalSize / mapFiles->size();
+
+			for (auto it = mapFiles->begin(); it != mapFiles->end(); ++it)
+			{
+				if (it->second.canRename)
+				{
+					if (avg / it->second.size > 8)
+					{
+						ren(it->second.fullName, "_cover;" + it->first, 0u, false);
+						it->second.canRename = false;
+					}
+				}
+			}
+		}
+
+		if (!resizedFound)
+		{
+			// For the rest of the files:
+			for (auto it = mapFiles->begin(); it != mapFiles->end(); ++it)
+			{
+				if (it->second.canRename && !it->second.isResized)
+				{
+					if (option == 'y' || option == 'Y')
+					{
+						ren(it->second.fullName, getNumericName(++cnt));
+						it->second.canRename = false;
+					}
+				}
+			}
+		}
+	}
+
+	std::fstream file;
+
+	file.open(_dir + "\\[info].txt", std::fstream::in | std::fstream::app);
+
+	if (file.is_open())
+	{
+		file.write(data.c_str(), data.length());
+		file.close();
+	}
+
+#endif
 	return;
 }
 
