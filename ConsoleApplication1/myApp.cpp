@@ -9,7 +9,7 @@ void myApp::selectOption()
 	std::cout << std::endl;
 	std::cout << " Select option:\n\n";
 	std::cout << " 1. Rearrange directories depending on files size/dimensions (Before the resize)\n";
-	std::cout << " 2. Check the files (After the resize)\n";
+	std::cout << " 2. Analyze the files (After the resize)\n";
 	std::cout << " 3. Restore original file names\n";
 	std::cout << " 0. Exit\n";
 	std::cout << " >> ";
@@ -229,7 +229,7 @@ void myApp::findFiles(std::string dir, std::map<std::string, myApp::fileInfo, my
 					inf.fullName  = fullName;
 					inf.size	  = size;
 					inf.canRename = true;
-					inf.isResized = (name.substr(pos - 2u, 3u) == ".r.");
+					inf.isResized = (pos >= 2u && name.substr(pos - 2u, 3u) == ".r.");
 
 					map.emplace(name, inf);
 				}
@@ -816,10 +816,15 @@ void myApp::checkOnRenamed()
 
 			data += "\n";
 			data += " Files resized:\n";
-			data += "  Original size : " + std::to_string((float)size_original / 1024 / 1024);
+			data += "  Original size   : " + std::to_string((float)size_original / 1024 / 1024);
 			data += '\n';
-			data += "  Resized size  : " + std::to_string((float)size_resized / 1024 / 1024);
+			data += "  Resized size    : " + std::to_string((float)size_resized  / 1024 / 1024);
 			data += '\n';
+			data += "  Saved disk space: " + std::to_string(((float)size_original / 1024 / 1024) - ((float)size_resized / 1024 / 1024));
+			data += '\n';
+
+			if (size_original <= size_resized)
+				data += "\n  WOW! Resized files are actually LARGER! 0_o\n";
 
 			std::fstream file;
 
