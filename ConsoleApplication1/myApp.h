@@ -91,10 +91,11 @@ class myApp
         {
             std::string                                     fullName;
             std::map<std::string, myApp::fileInfo, myCmp>   files;
+            char                                            mode;
         };
 
 	
-		enum DIRS { RESIZE, QUALITY, RESIZED };
+		enum DIRS { RESIZE, QUALITY, RESIZED, SKIPPED };
 
 	public:
 
@@ -102,8 +103,6 @@ class myApp
 		{
 			if (_dir.back() != '\\')
 				_dir += "\\";
-
-			createAuxDirs();
 		}
 
         void process();
@@ -129,9 +128,9 @@ static  void extractPath(int argc, char** argv, std::string& path)
 	private:
 
         void    selectOption    ();
-		void    createAuxDirs   ();
+		void    createAuxDirs   (bool);
         void	findDirs        (std::string);
-        void	findFiles       (std::string, std::map<std::string, myApp::fileInfo, myCmp> &);
+        void	findFiles       (std::string, dirInfo &);
         bool	GetImageSize    (const char*, int&, int&);
         bool	dirExists       (std::string);
         void	mkDir           (std::string);
@@ -149,6 +148,7 @@ static  void extractPath(int argc, char** argv, std::string& path)
 		std::string _dirResize;
 		std::string _dirQuality;
         std::string _dirResized;
+        std::string _dirSkipped;
 
         std::map<std::string, dirInfo> _mapDirs;
 };

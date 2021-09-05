@@ -27,6 +27,10 @@ int main(int argc, char** argv)
         std::cout << " Done: Fail" << std::endl;
     }
 
+#if defined MY_DEBUG
+    getchar();
+#endif
+
     return 0;
 }
 
