@@ -19,15 +19,15 @@ void myApp::selectOption()
 	switch (ch)
 	{
 		case '1':
-			_mode = 1;
+			_mode = MODE::REARRANGE;
 			break;
 
 		case '2':
-			_mode = 2;
+			_mode = MODE::ANALYZE;
 			break;
 
 		case '3':
-			_mode = 3;
+			_mode = MODE::RESTORE;
 			break;
 	}
 
@@ -42,28 +42,31 @@ void myApp::process()
 
 	switch (_mode)
 	{
-		case 1: {
+		case MODE::REARRANGE: {
 
 				// Read file structure and get files info
 				std::cout << " Reading directory structure..." << std::endl;
 				readFiles(_dir);
 
-				createAuxDirs(true);
+				if (_mapDirs.size())
+				{
+					createAuxDirs(true);
 
-				// Rename files (optional, will be asked about it)
-				std::cout << " Renaming files..." << std::endl;
-				renameFiles();
+					// Rename files (optional, will be asked about it)
+					std::cout << " Renaming files..." << std::endl;
+					renameFiles();
 
-				// Move directories
-				std::cout << " Rearranging directories..." << std::endl;
-				sortDirs();
+					// Move directories
+					std::cout << " Rearranging directories..." << std::endl;
+					sortDirs();
+				}
 
 				std::cout << " Done: OK" << std::endl;
 
 			}
 			break;
 
-		case 2: {
+		case MODE::ANALYZE: {
 
 				createAuxDirs(false);
 				std::cout << " Checking files..." << std::endl;
@@ -72,7 +75,7 @@ void myApp::process()
 			}
 			break;
 
-		case 3: {
+		case MODE::RESTORE: {
 
 				std::cout << " Not implemented yet =(" << std::endl;
 

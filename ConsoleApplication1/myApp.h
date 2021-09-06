@@ -8,7 +8,7 @@
 #include <map>
 #include <fstream>
 
-// Custom comparator
+// Custom comparator for the map container
 // Sorts file names in alpha-numeric order:
 // [9, 33, 222, 1111] instead of [1111, 222, 33, 9]
 struct myCmp
@@ -96,10 +96,11 @@ class myApp
 
 	
 		enum DIRS { RESIZE, QUALITY, RESIZED, SKIPPED };
+        enum MODE { EXIT, REARRANGE, ANALYZE, RESTORE };
 
 	public:
 
-		myApp(const char* dir) : _dir(dir), _mode(0)
+		myApp(const char* dir) : _dir(dir), _mode(MODE::EXIT)
 		{
 			if (_dir.back() != '\\')
 				_dir += "\\";
