@@ -45,7 +45,7 @@ void myApp::process()
 		case 1: {
 
 				// Read file structure and get files info
-				std::cout << " Reading files..." << std::endl;
+				std::cout << " Reading directory structure..." << std::endl;
 				readFiles(_dir);
 
 				createAuxDirs(true);
@@ -66,7 +66,7 @@ void myApp::process()
 		case 2: {
 
 				createAuxDirs(false);
-				std::cout << " Checking files:" << std::endl;
+				std::cout << " Checking files..." << std::endl;
 				checkOnRenamed();
 
 			}
@@ -459,65 +459,66 @@ void myApp::createAuxDirs(bool doCreate)
 
 // -----------------------------------------------------------------------------------------------
 
+bool myApp::ren(std::string oldName, std::string newName, std::string &newFullName, std::string &logData, size_t cnt /*=0*/, bool ext /*=true*/)
+{
+	size_t pos = oldName.find_last_of('\\') + 1;
+
+	// add new name
+	newFullName = oldName.substr(0, pos) + newName;
+
+	// add counter
+	if (cnt)
+		newFullName += std::to_string(cnt);
+
+	// add extension
+	if (ext)
+	{
+		pos = oldName.find_last_of('.');
+
+		if (pos != std::string::npos)
+			newFullName += oldName.substr(pos, oldName.length());
+	}
+
+	if (oldName != newFullName)
+	{
+		//			std::cout << " ren '" << oldName << "' to '" << newFullName << "'" << std::endl;
+
+		BOOL b = MoveFileA(oldName.c_str(), newFullName.c_str());
+
+		logData += oldName;
+		logData += " => ";
+		logData += newFullName.substr(newFullName.find_last_of('\\') + 1u, newFullName.length());
+		logData += b ? "  -- Ok" : "  -- Fail";
+		logData += "\n";
+
+		return b != 0;
+	}
+
+	return false;
+}
+
+// -----------------------------------------------------------------------------------------------
+
+std::string myApp::getNumericName(size_t num, size_t len)
+{
+	std::string res = std::to_string(num);
+
+	len = len < 3u ? 3u : len;
+
+	while (res.length() != len)
+		res.insert(0, "0");
+
+	return res;
+}
+
+// -----------------------------------------------------------------------------------------------
+
 void myApp::renameFiles()
 {
-	std::string data;
-
-	// ------------------------------------------------------------------------
-
-	auto ren = [&data](std::string oldName, std::string newName, std::string &newFullName, size_t cnt = 0u, bool ext = true) -> bool
-	{
-		size_t pos = oldName.find_last_of('\\') + 1;
-
-		// add new name
-		newFullName = oldName.substr(0, pos) + newName;
-
-		// add counter
-		if (cnt)
-			newFullName += std::to_string(cnt);
-
-		// add extension
-		if (ext)
-		{
-			pos = oldName.find_last_of('.');
-
-			if(pos != std::string::npos)
-				newFullName += oldName.substr(pos, oldName.length());
-		}
-
-		if (oldName != newFullName)
-		{
-//			std::cout << " ren '" << oldName << "' to '" << newFullName << "'" << std::endl;
-
-			BOOL b = MoveFileA(oldName.c_str(), newFullName.c_str());
-
-			data += oldName;
-			data += " => ";
-			data += newFullName.substr(newFullName.find_last_of('\\') + 1u, newFullName.length());
-			data += b ? "  -- Ok" : "  -- Fail";
-			data += "\n";
-
-			return b != 0;
-		}
-
-		return false;
-	};
-
-	auto getNumericName = [](size_t num) -> std::string
-	{
-		std::string res = std::to_string(num);
-
-		while (res.length() != 3u)
-			res.insert(0, "0");
-
-		return res;
-	};
-
-	// ------------------------------------------------------------------------
-
-	static char opt_RenameFiles(0);
-	static char opt_RenameCovers(0);
-	std::string newFullName;
+	static char		opt_RenameFiles(0);
+	static char		opt_RenameCovers(0);
+	std::string		newFullName;
+	std::string		logData;
 
 	if (!opt_RenameFiles)
 	{
@@ -533,97 +534,141 @@ void myApp::renameFiles()
 		std::cout << std::endl;
 	}
 
-	// For each dir:
+	bool doRenameCovers = (opt_RenameCovers == 'y' || opt_RenameCovers == 'Y');
+	bool doRenameFiles  = (opt_RenameFiles  == 'y' || opt_RenameFiles  == 'Y');
+
+	// For each dir: rename files
 	for (auto iter = _mapDirs.begin(); iter != _mapDirs.end(); ++iter)
 	{
-		bool resizedFound = false;
+		renFiles(iter->second, doRenameCovers, doRenameFiles, logData);
+	}
 
-		// Skip any folder that has subfolders
-		if (iter->second.mode == 1)
-			continue;
+	// Save the log
+	std::fstream file;
+	file.open(_dir + "\\[info].txt", std::fstream::in | std::fstream::app);
 
-		size_t cnt_cover(0u), cnt_z_cover(0u), cnt(0u), totalSize(0u);
+	if (file.is_open())
+	{
+		file.write(logData.c_str(), logData.length());
+		file.close();
+	}
 
-		auto mapFiles = &(iter->second.files);
+	return;
+}
 
-		// Try to find out if any of the files were resized already:
-		for (auto it = mapFiles->begin(); it != mapFiles->end(); ++it)
+// -----------------------------------------------------------------------------------------------
+
+void myApp::renFiles(dirInfo &di, bool doRenameCovers, bool doRenameFiles, std::string &logData)
+{
+	bool			resizedFound = false;
+	std::string		newFullName;
+	size_t			cnt_cover(0u), cnt_z_cover(0u), cnt(0u), totalSize(0u);
+	const char *	d	 = "==========================================================================================\n";
+
+	// Skip any folder that has subfolders
+	if (di.mode == 1)
+		return;
+
+	// Try to find out if any of the files were resized already:
+	for (auto it = di.files.begin(); it != di.files.end(); ++it)
+	{
+		totalSize += it->second.size;
+
+		if (it->second.isResized)
+			resizedFound = true;
+	}
+
+	// No need to rename anything: some files have already been renamed earlier
+	if (resizedFound)
+		return;
+
+	logData += d;
+
+	// Try to find covers first:
+	for (auto it = di.files.begin(); it != di.files.end(); ++it)
+	{
+		if (it->second.canRename)
 		{
-			totalSize += it->second.size;
+			std::string name = toLower(it->first);
 
-			if (it->second.isResized)
-				resizedFound = true;
+			// Cover found
+			if (name.find("cover") != std::string::npos)
+			{
+				// Mark it, so it would not be renamed later
+				it->second.canRename = false;
+
+				if (doRenameCovers)
+				{
+					if (name.find("z_cover") == 0u)
+					{
+						cnt_z_cover++;
+						continue;
+					}
+
+					if (name.find("_cover") == 0u)
+					{
+						cnt_cover++;
+						continue;
+					}
+
+					if (name.find("clean") != std::string::npos)
+					{
+						ren(it->second.fullName, "z_cover", newFullName, logData, cnt_z_cover);
+						cnt_z_cover++;
+						continue;
+					}
+
+					{
+						ren(it->second.fullName, "_cover", newFullName, logData, cnt_cover);
+						cnt_cover++;
+					}
+				}
+			}
 		}
+	}
 
-		// No need to rename anything
-		if (resizedFound)
-		{
-			continue;
-		}
+	// No cover files were found
+	// Try to find files that are significantly smaller than average file size in this dir:
+	if (cnt_cover + cnt_z_cover == 0u)
+	{
+		float avg = (float)totalSize / di.files.size();
 
-		// Try to find covers first:
-		for (auto it = mapFiles->begin(); it != mapFiles->end(); ++it)
+		for (auto it = di.files.begin(); it != di.files.end(); ++it)
 		{
 			if (it->second.canRename)
 			{
-				// Cover found
-				if (it->first.find("cover") != std::string::npos)
+				// 8 is just a guess here
+				if (avg / it->second.size > 8)
 				{
-					// Mark it, so it would not be renamed later
-					it->second.canRename = false;
-
-					if (opt_RenameCovers == 'y' || opt_RenameCovers == 'Y')
+					if (doRenameCovers)
 					{
-						if (it->first.find("clean") != std::string::npos)
-						{
-							ren(it->second.fullName, "z_cover", newFullName, cnt_z_cover);
-							cnt_z_cover++;
-						}
-						else
-						{
-							ren(it->second.fullName, "_cover", newFullName, cnt_cover);
-							cnt_cover++;
-						}
+						ren(it->second.fullName, "_cover;" + it->first, newFullName, logData, 0u, false);
+						it->second.canRename = false;
+						cnt_cover++;
 					}
 				}
 			}
 		}
+	}
 
-		// No cover files were found
-		// Try to find files that are significantly smaller than average file size in this dir:
-		if (cnt_cover + cnt_z_cover == 0u)
-		{
-			float avg = (float)totalSize / mapFiles->size();
-
-			for (auto it = mapFiles->begin(); it != mapFiles->end(); ++it)
-			{
-				if (it->second.canRename)
-				{
-					if (avg / it->second.size > 8)
-					{
-						if (opt_RenameCovers == 'y' || opt_RenameCovers == 'Y')
-						{
-							ren(it->second.fullName, "_cover;" + it->first, newFullName, 0u, false);
-							it->second.canRename = false;
-						}
-					}
-				}
-			}
-		}
-
-		// Rename the rest of the files:
+	// Rename the rest of the files:
+	{
 		std::vector<std::string> vec;
-			
+
+		// Make sure we have enough length for numeric name ('001', '0001', '00001', etc)
+		size_t totalCnt = di.files.size() - cnt_cover - cnt_z_cover;
+		totalCnt = std::to_string(totalCnt).length();
+
 		// Pass 1, to temporary name:
-		for (auto it = mapFiles->begin(); it != mapFiles->end(); ++it)
+		for (auto it = di.files.begin(); it != di.files.end(); ++it)
 		{
 			if (it->second.canRename && !it->second.isResized)
 			{
-				if (opt_RenameFiles == 'y' || opt_RenameFiles == 'Y')
+				if (doRenameFiles)
 				{
-					std::string tmpName("_tmp_" + getNumericName(++cnt));
+					std::string tmpName("_tmp_" + getNumericName(++cnt, totalCnt));
 
-					ren(it->second.fullName, tmpName, newFullName);
+					ren(it->second.fullName, tmpName, newFullName, logData);
 					it->second.canRename = false;
 
 					vec.push_back(newFullName);
@@ -636,19 +681,8 @@ void myApp::renameFiles()
 		// Pass 2, final:
 		for (auto it = vec.begin(); it != vec.end(); ++it)
 		{
-			ren(*it, getNumericName(++cnt), newFullName);
+			ren(*it, getNumericName(++cnt, totalCnt), newFullName, logData);
 		}
-
-	}
-
-	std::fstream file;
-
-	file.open(_dir + "\\[info].txt", std::fstream::in | std::fstream::app);
-
-	if (file.is_open())
-	{
-		file.write(data.c_str(), data.length());
-		file.close();
 	}
 
 	return;
@@ -659,8 +693,8 @@ void myApp::renameFiles()
 // Read info about all the files into map
 void myApp::readFiles(std::string dir)
 {
-	int x(0), y(0);
-	size_t i(0u);
+	int		x(0), y(0);
+	size_t	i(0u);
 
 	findDirs(dir);
 
@@ -685,15 +719,15 @@ void myApp::readFiles(std::string dir)
 
 						it->second.width = x;
 						it->second.height = y;
-
-//						std::cout << "\t" << it->first << " [" << x << " x " << y << "]" << std::endl;
 					}
+
+					std::cout << "\t--> Found " << iter->second.files.size() << " files" << std::endl;
 				}
 				break;
 
 			case 1: {
 
-					std::cout << "    --> Has subfolders. Will be skipped" << std::endl;
+					std::cout << "\t--> Has subfolders. Will be skipped" << std::endl;
 
 				}
 				break;
@@ -894,8 +928,6 @@ void myApp::checkOnRenamed()
 			// Files
 			for (auto it = m.begin(); it != m.end(); ++it)
 			{
-				std::cout << it->first << std::endl;
-
 				// Leave covers as they are
 				if (isCover(it->first))
 					continue;
@@ -926,22 +958,24 @@ void myApp::checkOnRenamed()
 
 			for (auto it = map_not_resized.begin(); it != map_not_resized.end(); ++it)
 			{
-				data += "  ";
+				data += "\t";
 				data += it->first;
 				data += '\n';
 			}
 
-			data += "\n";
+
+			data += " =======================================================\n";
 			data += " - Files resized (" + std::to_string(cnt_resized) + ") -\n";
-			data += "  Original size    : " + std::to_string((float)size_original / 1024 / 1024);
+			data += "  Original size\t\t:\t" + std::to_string((float)size_original / 1024 / 1024);
 			data += '\n';
-			data += "  Resized size     : " + std::to_string((float)size_resized  / 1024 / 1024);
+			data += "  Resized size\t\t:\t" + std::to_string((float)size_resized  / 1024 / 1024);
 			data += '\n';
-			data += "  Saved disk space : " + std::to_string(((float)size_original / 1024 / 1024) - ((float)size_resized / 1024 / 1024));
+			data += "  Saved disk space\t:\t" + std::to_string(((float)size_original / 1024 / 1024) - ((float)size_resized / 1024 / 1024));
 			data += '\n';
 
 			if (size_original <= size_resized)
-				data += "\n  WOW! Resized files are actually LARGER! 0_o\n";
+				data += "\n  Be careful! Resized files are LARGER! 0_o\n";
+
 
 			// Move files into another directory
 			if (map_not_resized.size() > 4u)
@@ -962,9 +996,9 @@ void myApp::checkOnRenamed()
 				}
 			}
 
+			// Save log info into a file. If the file already exists, it will be replaced
 			std::fstream file;
-
-			file.open(iter->second.fullName + "\\[info].txt", std::fstream::in | std::fstream::app);
+			file.open(iter->second.fullName + "\\[info].txt", std::fstream::out);
 
 			if (file.is_open())
 			{
@@ -977,6 +1011,25 @@ void myApp::checkOnRenamed()
 	getchar();
 
 	return;
+}
+
+// -----------------------------------------------------------------------------------------------
+
+std::string myApp::toLower(std::string str) const
+{
+	std::string res(str);
+
+	for (size_t i = 0; i < res.length(); i++)
+	{
+		char ch = res[i];
+
+		if (ch > 64 && ch < 91)
+			ch += 32;
+
+		res[i] = ch;
+	}
+
+	return res;
 }
 
 // -----------------------------------------------------------------------------------------------

@@ -137,8 +137,13 @@ static  void extractPath(int argc, char** argv, std::string& path)
         void	mvDir           (std::string, std::string, enum DIRS);
         void    readFiles       (std::string);
         void    renameFiles     ();
+        void    renFiles        (dirInfo &, bool, bool, std::string &);
         void    sortDirs        ();
         void    checkOnRenamed  ();
+
+        bool        ren             (std::string, std::string, std::string &, std::string &, size_t = 0u, bool = true);
+        std::string getNumericName  (size_t, size_t);
+        std::string toLower         (std::string) const;
 
 	private:
 
