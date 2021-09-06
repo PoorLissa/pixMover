@@ -1,8 +1,5 @@
 #include "myApp.h"
 
-#define MY_DEBUG
-//#undef MY_DEBUG
-
 // -----------------------------------------------------------------------------------------------------------
 
 int main(int argc, char** argv)
@@ -11,8 +8,7 @@ int main(int argc, char** argv)
 
     myApp::extractPath(argc, argv, path);
 
-#if defined MY_DEBUG
-    path = "i:\\bbb";
+#if defined _DEBUG
     path = "d:\\test";
 #endif
 
@@ -27,7 +23,7 @@ int main(int argc, char** argv)
         std::cout << " Done: Fail" << std::endl;
     }
 
-#if defined MY_DEBUG
+#if defined _DEBUG
     getchar();
 #endif
 
