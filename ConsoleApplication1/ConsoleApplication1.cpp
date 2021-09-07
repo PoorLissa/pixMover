@@ -10,6 +10,7 @@ int main(int argc, char** argv)
 
 #if defined _DEBUG
     path = "d:\\test";
+    path = "C:\\_maxx\\test\\001";
 #endif
 
     if (!path.empty() && myApp::pathValid(path))

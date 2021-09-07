@@ -1,17 +1,22 @@
 #include "myApp.h"
 
+const char* tab_of_four = "    ";
+const char* ren_to      = " => ";
+const char* ren_ok      = "  -- Ok";
+const char* ren_fail    = "  -- Fail";
+
 // -----------------------------------------------------------------------------------------------
 
-void myApp::selectOption()
+void myApp::selectUserOption()
 {
 	char ch(0);
 
 	std::cout << std::endl;
-	std::cout << " Select option:\n\n";
+	std::cout << " Select mode:\n\n";
 	std::cout << " 1. Rearrange directories depending on files size/dimensions (Before the resize)\n";
 	std::cout << " 2. Analyze the files (After the resize)\n";
 	std::cout << " 3. Restore original file names\n";
-	std::cout << " 0. Exit\n";
+	std::cout << " q. Exit\n\n";
 	std::cout << " >> ";
 
 	std::cin >> ch;
@@ -38,11 +43,15 @@ void myApp::selectOption()
 
 void myApp::process()
 {
-	selectOption();
+    selectUserOption();
+
+    std::cout << " Selected mode: ";
 
 	switch (_mode)
 	{
 		case MODE::REARRANGE: {
+
+                std::cout << "Rearranging\n" << std::endl;
 
 				// Read file structure and get files info
 				std::cout << " Reading directory structure..." << std::endl;
@@ -68,6 +77,8 @@ void myApp::process()
 
 		case MODE::ANALYZE: {
 
+                std::cout << "Analysing\n" << std::endl;
+
 				createAuxDirs(false);
 				std::cout << " Checking files..." << std::endl;
 				checkOnRenamed();
@@ -77,13 +88,14 @@ void myApp::process()
 
 		case MODE::RESTORE: {
 
-				std::cout << " Not implemented yet =(" << std::endl;
+                std::cout << "Restoring\n" << std::endl;
+                restoreFileNames();
 
 			}
 			break;
 
 		default:
-			std::cout << " Exiting..." << std::endl;
+			std::cout << "Exiting" << std::endl;
 	}
 
 	std::cout << " Press any key to contiunue : " << std::endl;
@@ -392,6 +404,15 @@ bool myApp::dirExists(std::string dir)
 
 // -----------------------------------------------------------------------------------------------
 
+bool myApp::fileExists(std::string file)
+{
+    DWORD dwAttrib = GetFileAttributesA(file.c_str());
+
+    return (dwAttrib != INVALID_FILE_ATTRIBUTES && !(dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
+};
+
+// -----------------------------------------------------------------------------------------------
+
 void myApp::mkDir(std::string dir)
 {
 	dir = _dir + dir;
@@ -489,9 +510,9 @@ bool myApp::ren(std::string oldName, std::string newName, std::string &newFullNa
 		BOOL b = MoveFileA(oldName.c_str(), newFullName.c_str());
 
 		logData += oldName;
-		logData += " => ";
+        logData += ren_to;
 		logData += newFullName.substr(newFullName.find_last_of('\\') + 1u, newFullName.length());
-		logData += b ? "  -- Ok" : "  -- Fail";
+		logData += b ? ren_ok : ren_fail;
 		logData += "\n";
 
 		return b != 0;
@@ -1033,6 +1054,327 @@ std::string myApp::toLower(std::string str) const
 	}
 
 	return res;
+}
+
+// -----------------------------------------------------------------------------------------------
+
+void myApp::restoreFileNames()
+{
+    std::vector<std::string> vec;
+
+    int res = rstr_CheckFileStructure(vec);
+
+    std::cout << " Checking status: ";
+
+    if (!res)
+    {
+        std::cout << "Fail\n" << std::endl;
+    }
+    else
+    {
+        std::map<std::string, std::string> m1, m2;
+
+        std::cout << "Success\n" << std::endl;
+        std::cout << " Moving on...\n" << std::endl;
+
+        bool parseOk = rstr_ParseInfoVec(vec, m1, m2);
+
+        if (!parseOk)
+        {
+            std::cout << " Parsing '[info].txt' failed" << std::endl;
+            std::cout << tab_of_four << "Possible reasons:" << std::endl;
+            std::cout << tab_of_four << " - One of the lines in the file has status 'Fail'" << std::endl;
+            std::cout << tab_of_four << " - Incorrect syntax within one of the lines" << std::endl;
+            std::cout << std::endl;
+        }
+        else
+        {
+            std::cout << " Parsing results:\n";
+
+            for (auto m : m1)
+                std::cout << tab_of_four << "[" << m.first << "] => [" << m.second << "]" << std::endl;
+
+            std::cout << "\n";
+            for (auto m : m2)
+                std::cout << tab_of_four << "[" << m.first << "] => [" << m.second << "]" << std::endl;
+
+            std::cout << "\n Renaming files:\n";
+
+            int cnt = 0;
+
+            if (rstr_Rename(m2, m1, cnt))
+            {
+                std::cout << "\n Overall Renaming Status: Ok";
+            }
+            else
+            {
+                std::cout << "\n Overall Renaming Status: Fail";
+            }
+
+            std::cout << "\n\n";
+        }
+    }
+
+    return;
+}
+
+// -----------------------------------------------------------------------------------------------
+
+int myApp::rstr_CheckFileStructure(std::vector<std::string> &vec)
+{
+    auto check_vec = [](std::vector<std::string>& vec) -> bool
+    {
+        bool delimFound = false;
+
+        for (auto iter = vec.begin(); iter != vec.end(); ++iter)
+        {
+            if ((*iter)[0] == '=')
+                delimFound = true;
+
+            if (delimFound && (*iter)[0] != '=')
+                return false;
+        }
+
+        // So far so good. Let's remove delim lines
+        while (vec.back()[0] == '=')
+            vec.pop_back();
+
+        return true;
+    };
+
+    std::cout << " Checking file structure... " << std::endl;
+
+    // Look for the info file within the current dir:
+    std::string info = _dir + "[info].txt";
+
+    if (fileExists(info))
+    {
+        std::cout << tab_of_four << "[info].txt is found in '" << _dir << "'" << std::endl;
+
+        if (rstr_GetHistory(vec, info))
+        {
+            std::cout << tab_of_four << "[info].txt contains some records in it" << std::endl;
+
+            if (check_vec(vec))
+            {
+                std::cout << tab_of_four << "[info].txt records look good" << std::endl;
+                return 1;
+            }
+            else
+            {
+                std::cout << tab_of_four << "[info].txt records refer to more than one distinct directory" << std::endl;
+            }
+        }
+    }
+
+    // Look for the info file within the upper level dir:
+    info = _dir;
+
+    while (info.back() == '\\')
+        info.pop_back();
+
+    while (info.back() != '\\')
+        info.pop_back();
+
+    std::string dir(info);
+    info += "[info].txt";
+
+    if (fileExists(info))
+    {
+        std::cout << tab_of_four << "[info].txt is found in '" << dir << "'" << std::endl;
+
+        if (rstr_GetHistory(vec, info))
+        {
+            std::cout << tab_of_four << "[info].txt contains some records in it" << std::endl;
+
+            if (check_vec(vec))
+            {
+                std::cout << tab_of_four << "[info].txt records look good" << std::endl;
+                return 2;
+            }
+            else
+            {
+                std::cout << tab_of_four << "[info].txt records refer to more than one distinct directory" << std::endl;
+            }
+        }
+    }
+    
+    return 0;
+}
+
+// -----------------------------------------------------------------------------------------------
+
+bool myApp::rstr_GetHistory(std::vector<std::string>& vec, std::string &info)
+{
+    bool infoFound = false;
+    std::fstream file;
+
+    file.open(info, std::fstream::in);
+
+    if (file.is_open())
+    {
+        info.clear();
+        vec.clear();
+        std::string line, dir(_dir);
+
+        // 'C:\dir1\dir2\001' => '001'
+        if (dir.back() == '\\')
+        {
+            size_t pos = dir.rfind('\\', dir.length()-2u) + 1u;
+            dir = dir.substr(pos, dir.length() - pos - 1u);
+        }
+        else
+        {
+            size_t pos = dir.find_last_of('\\') + 1u;
+            dir = dir.substr(pos, dir.length() - pos);
+        }
+
+        dir = "\\" + dir + "\\";
+
+        while (std::getline(file, line))
+        {
+            if (line[0] == '=')
+            {
+                if (infoFound)
+                    vec.push_back(line);
+
+                continue;
+            }
+
+            if (line.find(dir) != std::string::npos)
+            {
+                infoFound = true;
+                vec.push_back(line);
+            }
+        }
+
+        file.close();
+    }
+
+    return infoFound;
+}
+
+// -----------------------------------------------------------------------------------------------
+
+bool myApp::rstr_ParseInfoVec(std::vector<std::string> &vec, std::map<std::string, std::string> &m1, std::map<std::string, std::string> &m2)
+{
+    // Gets the line 'C:\test\dir\file.jpg = > _tmp_001.jpg  -- Ok'
+    // and performs: map["_tmp_001.jpg"] = "C:\test\dir\file.jpg"
+    auto parse_line = [](std::map<std::string, std::string> &map, const std::string *str) -> bool
+    {
+        size_t pos = str->find(ren_to);
+
+        if (pos != std::string::npos)
+        {
+            std::string val = str->substr(0u, pos);                     // 'C:\test\dir\file.jpg'
+            std::string key = str->substr(pos + 4u, str->length());     // '_tmp_001.jpg  -- Ok'
+
+            val = val.substr(val.find_last_of('\\') + 1u, val.length());
+            key = key.substr(0u, key.find(ren_ok));
+
+            map[key] = val;
+            return true;
+        }
+
+        return false;
+    };
+
+    // -----------------------------------------------------------
+
+    m1.clear();
+    m2.clear();
+
+    for (auto iter = vec.begin(); iter != vec.end(); ++iter)
+    {
+        std::string* str = &(*iter);
+
+        const char* s = str->c_str() + str->length() - 5u;
+
+        // One of the lines does not end with "-- Ok"
+        if (strcmp(s, ren_ok + 2u) != 0)
+            return false;
+
+        if (str->find("=> _tmp_") != std::string::npos)
+        {
+            if (!parse_line(m1, str))
+                return false;
+        }
+        else
+        {
+            if (!parse_line(m2, str))
+                return false;
+        }
+    }
+
+    return true;
+}
+
+// -----------------------------------------------------------------------------------------------
+
+bool myApp::rstr_Rename(std::map<std::string, std::string> &m1, std::map<std::string, std::string> &m2, int &cnt)
+{
+    auto ren = [this](std::map<std::string, std::string> &map, const std::string &dir, int &cnt)
+    {
+        cnt = 0;
+
+        for (auto iter = map.begin(); iter != map.end(); ++iter)
+        {
+            std::string oldName = dir + iter->first;
+            std::string newName = dir + iter->second;
+
+            std::cout << tab_of_four << oldName << " => " << newName << ":\n" << tab_of_four << tab_of_four << "Status: ";
+
+            if (!fileExists(oldName))
+            {
+                std::cout << "Fail (src file does not exist)\n";
+                cnt++;
+                continue;
+            }
+
+            if (fileExists(newName))
+            {
+                std::cout << "Fatal Error (dest file already exists)\n";
+                return false;
+            }
+
+            if (MoveFileA(oldName.c_str(), newName.c_str()) == 0)
+            {
+                std::cout << "Fatal Error (renaming operation unsuccessful)\n";
+                return false;
+            }
+
+            std::cout << "Ok\n";
+        }
+
+        return true;
+    };
+
+    // ----------------------------------------------------
+
+    std::string str;
+
+    if (!ren(m1, _dir, cnt))
+        return false;
+
+    if (cnt)
+    {
+        str += " Renaming iteration 1: " + std::to_string(cnt) + "/" + std::to_string(m1.size()) + " src file(s) weren't found)\n";
+    }
+
+    if (!ren(m2, _dir, cnt))
+        return false;
+
+    if (cnt)
+    {
+        str += " Renaming iteration 2: " + std::to_string(cnt) + "/" + std::to_string(m2.size()) + " src file(s) weren't found)\n";
+    }
+
+    if (!str.empty())
+    {
+        std::cout << "\n" << str;
+    }
+
+    return true;
 }
 
 // -----------------------------------------------------------------------------------------------

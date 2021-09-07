@@ -104,6 +104,10 @@ class myApp
 		{
 			if (_dir.back() != '\\')
 				_dir += "\\";
+
+            std::cout << " myApp::myApp has started" << std::endl;
+            std::cout << " Current path is: " << _dir << std::endl;
+            std::cout << std::endl;
 		}
 
         void process();
@@ -128,12 +132,13 @@ static  void extractPath(int argc, char** argv, std::string& path)
 
 	private:
 
-        void    selectOption    ();
+        void    selectUserOption();
 		void    createAuxDirs   (bool);
         void	findDirs        (std::string);
         void	findFiles       (std::string, dirInfo &);
         bool	GetImageSize    (const char*, int&, int&);
         bool	dirExists       (std::string);
+        bool	fileExists      (std::string);
         void	mkDir           (std::string);
         void	mvDir           (std::string, std::string, enum DIRS);
         void    readFiles       (std::string);
@@ -141,6 +146,12 @@ static  void extractPath(int argc, char** argv, std::string& path)
         void    renFiles        (dirInfo &, bool, bool, std::string &);
         void    sortDirs        ();
         void    checkOnRenamed  ();
+        void    restoreFileNames();
+
+        int     rstr_CheckFileStructure (std::vector<std::string> &);
+        bool    rstr_GetHistory         (std::vector<std::string> &, std::string &);
+        bool    rstr_ParseInfoVec       (std::vector<std::string> &, std::map<std::string, std::string> &, std::map<std::string, std::string> &);
+        bool    rstr_Rename             (std::map<std::string, std::string> &, std::map<std::string, std::string> &, int &cnt);
 
         bool        ren             (std::string, std::string, std::string &, std::string &, size_t = 0u, bool = true);
         std::string getNumericName  (size_t, size_t);
