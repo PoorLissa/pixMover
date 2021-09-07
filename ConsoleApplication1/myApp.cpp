@@ -1349,6 +1349,15 @@ bool myApp::rstr_Rename(std::map<std::string, std::string> &m1, std::map<std::st
         return true;
     };
 
+    auto upd_info = [](const std::map<std::string, std::string>& map, std::string &info, int num, int cnt) -> void
+    {
+        if (cnt)
+        {
+            info += " Renaming iteration " + std::to_string(num) + ": "
+                                           + std::to_string(cnt) + "/" + std::to_string(map.size()) + " src file(s) weren't found)\n";
+        }
+    };
+
     // ----------------------------------------------------
 
     std::string str;
@@ -1356,18 +1365,12 @@ bool myApp::rstr_Rename(std::map<std::string, std::string> &m1, std::map<std::st
     if (!ren(m1, _dir, cnt))
         return false;
 
-    if (cnt)
-    {
-        str += " Renaming iteration 1: " + std::to_string(cnt) + "/" + std::to_string(m1.size()) + " src file(s) weren't found)\n";
-    }
+    upd_info(m1, str, 1, cnt);
 
     if (!ren(m2, _dir, cnt))
         return false;
 
-    if (cnt)
-    {
-        str += " Renaming iteration 2: " + std::to_string(cnt) + "/" + std::to_string(m2.size()) + " src file(s) weren't found)\n";
-    }
+    upd_info(m2, str, 2, cnt);
 
     if (!str.empty())
     {
