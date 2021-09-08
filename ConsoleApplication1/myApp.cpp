@@ -393,9 +393,10 @@ bool myApp::GetImageSize(const char* fileName, int& x, int& y)
 
 // -----------------------------------------------------------------------------------------------
 
-bool myApp::dirExists(std::string dir)
+bool myApp::dirExists(std::string dir, bool isPathAbsolute /*=false*/)
 {
-	dir = _dir + dir;
+    if(!isPathAbsolute)
+	    dir = _dir + dir;
 
 	DWORD dwAttrib = GetFileAttributesA(dir.c_str());
 
@@ -1146,80 +1147,54 @@ int myApp::rstr_CheckFileStructure(std::vector<std::string> &vec)
 
     std::cout << " Checking file structure... " << std::endl;
 
-    // Look for the info file within the current dir:
-    std::string info = _dir + "[info].txt";
+    // Here we're going to look for the [info].txt file in 2 subsequent directories starting with the current one
+    // But if the 2nd level directory is one of our AUX directories, we'll also try to find the file 3 levels up from here
+    std::string path = _dir;
 
-    if (fileExists(info))
+    for (size_t i = 0; i < 3u; i++)
     {
-        std::cout << tab_of_four << "[info].txt is found in '" << _dir << "'" << std::endl;
+        std::string dir = getUpperLevelDirectory(path, i);
 
-        if (rstr_GetHistory(vec, info))
+        std::cout << tab_of_four << " --> looking in: " << dir << "'" << std::endl;
+
+        if (dirExists(dir, true))
         {
-            std::cout << tab_of_four << "[info].txt contains some records in it" << std::endl;
+            std::string info = dir + "[info].txt";
 
-            if (check_vec(vec))
+            if (fileExists(info))
             {
-                std::cout << tab_of_four << "[info].txt records look good" << std::endl;
-                return 1;
+                std::cout << tab_of_four << "[info].txt is found in '" << dir << "'" << std::endl;
+
+                if (rstr_GetHistory(vec, info))
+                {
+                    std::cout << tab_of_four << "[info].txt contains some records in it" << std::endl;
+
+                    if (check_vec(vec))
+                    {
+                        std::cout << tab_of_four << "[info].txt records look good" << std::endl;
+                        return 1;
+                    }
+                    else
+                    {
+                        std::cout << tab_of_four << "[info].txt records refer to more than one distinct directory" << std::endl;
+                    }
+                }
             }
-            else
+
+            if (i == 1u)
             {
-                std::cout << tab_of_four << "[info].txt records refer to more than one distinct directory" << std::endl;
+                std::string curr = getCurrentDirFromPath(dir);
+
+                bool isAUX = curr == "[__do_resize]"        || 
+                             curr == "[__skipped]"          ||
+                             curr == "[__do_lower_quality]" ||
+                             curr == "[__files.r]";
+                if(!isAUX)
+                    break;
             }
         }
     }
 
-    // Look for the info file within the upper level dir:
-    info = _dir;
-
-    while (info.back() == '\\')
-        info.pop_back();
-
-    while (info.back() != '\\')
-        info.pop_back();
-
-	// Check if we're in one of the aux directories:
-	bool doTry3times = false;
-
-	if (info.length() > 5u)
-	{
-		size_t cnt = 0u, len = info.length();
-
-		for (size_t i = 0u; i < info.length(); i++)
-		{
-			if (info[len-i] == '\\' && ++cnt == 2u)
-			{
-				std::string sss = info.substr(len-i+1u, i-2u);
-
-				if (sss == "[__do_resize]")
-					doTry3times = true;
-			}
-		}
-	}
-
-    std::string dir(info);
-    info += "[info].txt";
-
-    if (fileExists(info))
-    {
-        std::cout << tab_of_four << "[info].txt is found in '" << dir << "'" << std::endl;
-
-        if (rstr_GetHistory(vec, info))
-        {
-            std::cout << tab_of_four << "[info].txt contains some records in it" << std::endl;
-
-            if (check_vec(vec))
-            {
-                std::cout << tab_of_four << "[info].txt records look good" << std::endl;
-                return 2;
-            }
-            else
-            {
-                std::cout << tab_of_four << "[info].txt records refer to more than one distinct directory" << std::endl;
-            }
-        }
-    }
-    
     return 0;
 }
 
@@ -1413,6 +1388,26 @@ std::string myApp::getUpperLevelDirectory(const std::string &path, size_t level)
 			cnt++;
 
 	return path.substr(0, pos + 1u);
+}
+
+// -----------------------------------------------------------------------------------------------
+
+std::string myApp::getCurrentDirFromPath(const std::string &path) const
+{
+    size_t len = path.length();
+
+    if (len == 3u)
+        return path;
+
+    size_t pos(len - 1u), cnt(0u);
+
+    if (path[pos] == '\\')
+        cnt++;
+
+    while (path[pos - cnt] != '\\')
+        pos--;
+
+    return path.substr(pos, len - pos - cnt);
 }
 
 // -----------------------------------------------------------------------------------------------

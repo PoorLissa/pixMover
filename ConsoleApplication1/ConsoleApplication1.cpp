@@ -9,9 +9,11 @@ int main(int argc, char** argv)
     myApp::extractPath(argc, argv, path);
 
 #if defined _DEBUG
-    path = "C:\\_maxx\\test\\001";
-    path = "d:\\test";
     path = "D:\\test\\[__do_resize]\\ViksiQ - Release";
+    path = "d:\\test";
+    path = "C:\\_maxx\\test\\001";
+    path = "C:\\_maxx\\test";
+    path = "C:\\_maxx\\test\\[__do_resize]\\001";
 #endif
 
     if (!path.empty() && myApp::pathValid(path))
