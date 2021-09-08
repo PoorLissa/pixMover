@@ -1142,6 +1142,8 @@ int myApp::rstr_CheckFileStructure(std::vector<std::string> &vec)
         return true;
     };
 
+	// ------------------------------------------------------------
+
     std::cout << " Checking file structure... " << std::endl;
 
     // Look for the info file within the current dir:
@@ -1175,6 +1177,25 @@ int myApp::rstr_CheckFileStructure(std::vector<std::string> &vec)
 
     while (info.back() != '\\')
         info.pop_back();
+
+	// Check if we're in one of the aux directories:
+	bool doTry3times = false;
+
+	if (info.length() > 5u)
+	{
+		size_t cnt = 0u, len = info.length();
+
+		for (size_t i = 0u; i < info.length(); i++)
+		{
+			if (info[len-i] == '\\' && ++cnt == 2u)
+			{
+				std::string sss = info.substr(len-i+1u, i-2u);
+
+				if (sss == "[__do_resize]")
+					doTry3times = true;
+			}
+		}
+	}
 
     std::string dir(info);
     info += "[info].txt";
@@ -1378,6 +1399,20 @@ bool myApp::rstr_Rename(std::map<std::string, std::string> &m1, std::map<std::st
     }
 
     return true;
+}
+
+// -----------------------------------------------------------------------------------------------
+
+// Moves up the directory path and returns the new path
+std::string myApp::getUpperLevelDirectory(const std::string &path, size_t level) const
+{
+	size_t pos(path.length() - 1u), cnt(0u);
+
+	while (cnt != level)
+		if (path[--pos] == '\\')
+			cnt++;
+
+	return path.substr(0, pos + 1u);
 }
 
 // -----------------------------------------------------------------------------------------------

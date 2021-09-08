@@ -148,14 +148,15 @@ static  void extractPath(int argc, char** argv, std::string& path)
         void    checkOnRenamed  ();
         void    restoreFileNames();
 
-        int     rstr_CheckFileStructure (std::vector<std::string> &);
-        bool    rstr_GetHistory         (std::vector<std::string> &, std::string &);
-        bool    rstr_ParseInfoVec       (std::vector<std::string> &, std::map<std::string, std::string> &, std::map<std::string, std::string> &);
-        bool    rstr_Rename             (std::map<std::string, std::string> &, std::map<std::string, std::string> &, int &cnt);
+        int     rstr_CheckFileStructure     (std::vector<std::string> &);
+        bool    rstr_GetHistory             (std::vector<std::string> &, std::string &);
+        bool    rstr_ParseInfoVec           (std::vector<std::string> &, std::map<std::string, std::string> &, std::map<std::string, std::string> &);
+        bool    rstr_Rename                 (std::map<std::string, std::string> &, std::map<std::string, std::string> &, int &cnt);
 
-        bool        ren             (std::string, std::string, std::string &, std::string &, size_t = 0u, bool = true);
-        std::string getNumericName  (size_t, size_t);
-        std::string toLower         (std::string) const;
+        bool        ren                     (std::string, std::string, std::string &, std::string &, size_t = 0u, bool = true);
+        std::string getNumericName          (size_t, size_t);
+        std::string toLower                 (std::string) const;
+        std::string getUpperLevelDirectory  (const std::string &, size_t) const;
 
 	private:
 
