@@ -1155,8 +1155,6 @@ int myApp::rstr_CheckFileStructure(std::vector<std::string> &vec)
     {
         std::string dir = getUpperLevelDirectory(path, i);
 
-        std::cout << tab_of_four << " --> looking in: " << dir << "'" << std::endl;
-
         if (dirExists(dir, true))
         {
             std::string info = dir + "[info].txt";
@@ -1399,10 +1397,7 @@ std::string myApp::getCurrentDirFromPath(const std::string &path) const
     if (len == 3u)
         return path;
 
-    size_t pos(len - 1u), cnt(0u);
-
-    if (path[pos] == '\\')
-        cnt++;
+    size_t pos(len - 1u), cnt(path[pos] == '\\' ? 1u : 0u);
 
     while (path[pos - cnt] != '\\')
         pos--;
