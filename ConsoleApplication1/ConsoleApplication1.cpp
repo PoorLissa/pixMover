@@ -12,8 +12,8 @@ int main(int argc, char** argv)
     path = "D:\\test\\[__do_resize]\\ViksiQ - Release";
     path = "d:\\test";
     path = "C:\\_maxx\\test\\001";
-    path = "C:\\_maxx\\test";
     path = "C:\\_maxx\\test\\[__do_resize]\\001";
+    path = "C:\\_maxx\\test";
 #endif
 
     if (!path.empty() && myApp::pathValid(path))

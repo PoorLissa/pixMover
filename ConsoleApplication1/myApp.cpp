@@ -1,9 +1,19 @@
 #include "myApp.h"
 
-const char* tab_of_four = "    ";
-const char* ren_to      = " => ";
-const char* ren_ok      = "  -- Ok";
-const char* ren_fail    = "  -- Fail";
+// -----------------------------------------------------------------------------------------------
+
+namespace myGlobals {
+
+    const char* tab_of_four         = "    ";
+    const char* ren_to              = " => ";
+    const char* ren_ok              = "  -- Ok";
+    const char* ren_fail            = "  -- Fail";
+    const char* aux_dir_resize      = "[__do_resize]";
+    const char* aux_dir_quality     = "[__do_lower_quality]";
+    const char* aux_dir_resized     = "[__files.r]";
+    const char* aux_dir_skipped     = "[__skipped]";
+    const char* aux_dir_not_resized = "[-not-resized-]";
+};
 
 // -----------------------------------------------------------------------------------------------
 
@@ -34,6 +44,9 @@ void myApp::selectUserOption()
 		case '3':
 			_mode = MODE::RESTORE;
 			break;
+
+        default:
+            _mode = MODE::EXIT;
 	}
 
 	return;
@@ -59,8 +72,6 @@ void myApp::process()
 
 				if (_mapDirs.size())
 				{
-					createAuxDirs(true);
-
 					// Rename files (optional, will be asked about it)
 					std::cout << " Renaming files..." << std::endl;
 					renameFiles();
@@ -79,8 +90,13 @@ void myApp::process()
 
                 std::cout << "Analysing\n" << std::endl;
 
+                std::cout << myGlobals::tab_of_four << "Looking for files only in these subfolders:" << std::endl;
+                std::cout << myGlobals::tab_of_four << "  " << myGlobals::aux_dir_resize  << std::endl;
+                std::cout << myGlobals::tab_of_four << "  " << myGlobals::aux_dir_quality << std::endl;
+                std::cout << std::endl;
+
 				createAuxDirs(false);
-				std::cout << " Checking files..." << std::endl;
+				std::cout << " Checking files...\n" << std::endl;
 				checkOnRenamed();
 
 			}
@@ -110,6 +126,13 @@ void myApp::process()
 // Get list of directories within the directory
 void myApp::findDirs(std::string dir)
 {
+    const char* names_to_skip[] = { ".", "..",
+                                        myGlobals::aux_dir_quality,
+                                        myGlobals::aux_dir_resize,
+                                        myGlobals::aux_dir_resized,
+                                        myGlobals::aux_dir_skipped
+    };
+
 	WIN32_FIND_DATA ffd;
 	TCHAR szDir[MAX_PATH];
 	HANDLE hFind = INVALID_HANDLE_VALUE;
@@ -146,8 +169,19 @@ void myApp::findDirs(std::string dir)
 
 				fullName += "\\";
 
+                bool isOk = true;
+
+                for (size_t i = 0; i < sizeof(names_to_skip) / sizeof(names_to_skip[0]); i++)
+                {
+                    if (name == names_to_skip[i])
+                    {
+                        isOk = false;
+                        break;
+                    }
+                }
+
 				// Remember the name
-				if (name != "." && name != "..")
+                if (isOk)
 				{
 					if (fullName != _dirQuality && fullName != _dirResize)
 					{
@@ -393,10 +427,11 @@ bool myApp::GetImageSize(const char* fileName, int& x, int& y)
 
 // -----------------------------------------------------------------------------------------------
 
-bool myApp::dirExists(std::string dir, bool isPathAbsolute /*=false*/)
+bool myApp::dirExists(std::string dir)
 {
-    if(!isPathAbsolute)
-	    dir = _dir + dir;
+    // Check if path is relative or absolute
+    if (dir.length() > 3u && dir[1] != ':')
+        dir = _dir + dir;
 
 	DWORD dwAttrib = GetFileAttributesA(dir.c_str());
 
@@ -416,7 +451,9 @@ bool myApp::fileExists(std::string file)
 
 void myApp::mkDir(std::string dir)
 {
-	dir = _dir + dir;
+    // Check if path is relative or absolute
+    if(dir.length() > 3u && dir[1] != ':')
+	    dir = _dir + dir;
 
 	CreateDirectoryA(dir.c_str(), NULL);
 
@@ -427,7 +464,9 @@ void myApp::mkDir(std::string dir)
 
 void myApp::mvDir(std::string shortName, std::string fullName, enum DIRS d)
 {
-	std::string dest = _dir;
+	std::string dest(_dir);
+
+    static char bits[4] = { 0 };
 
 	switch (d)
 	{
@@ -448,9 +487,27 @@ void myApp::mvDir(std::string shortName, std::string fullName, enum DIRS d)
 			break;
 	}
 
+    if (bits[d] == 0)
+    {
+        bits[d] = 1;
+
+        if (!dirExists(dest))
+        {
+            std::cout << myGlobals::tab_of_four << "Creating dir : " << dest << std::endl;
+            mkDir(dest);
+        }
+    }
+
 	dest += shortName;
 
-	MoveFileExA(fullName.c_str(), dest.c_str(), MOVEFILE_WRITE_THROUGH);
+    BOOL b = MoveFileExA(fullName.c_str(), dest.c_str(), MOVEFILE_WRITE_THROUGH);
+
+    if (!b)
+    {
+        std::cout << myGlobals::tab_of_four << "Move func failed. See error log for details." << std::endl;
+        std::string err = " --> Move failed: " + fullName + " => " + dest;
+        logError(err);
+    }
 
 	return;
 }
@@ -461,23 +518,23 @@ void myApp::createAuxDirs(bool doCreate)
 {
 	if (doCreate)
 	{
-		if (!dirExists("[__do_resize]"))
-			mkDir("[__do_resize]");
+		if (!dirExists(myGlobals::aux_dir_resize))
+			mkDir(myGlobals::aux_dir_resize);
 
-		if (!dirExists("[__do_lower_quality]"))
-			mkDir("[__do_lower_quality]");
+		if (!dirExists(myGlobals::aux_dir_quality))
+			mkDir(myGlobals::aux_dir_quality);
 
-		if (!dirExists("[__files.r]"))
-			mkDir("[__files.r]");
+		if (!dirExists(myGlobals::aux_dir_resized))
+			mkDir(myGlobals::aux_dir_resized);
 
-		if (!dirExists("[__skipped]"))
-			mkDir("[__skipped]");
+		if (!dirExists(myGlobals::aux_dir_skipped))
+			mkDir(myGlobals::aux_dir_skipped);
 	}
 
-	_dirResize  = _dir + "[__do_resize]\\";
-	_dirQuality = _dir + "[__do_lower_quality]\\";
-	_dirResized = _dir + "[__files.r]\\";
-	_dirSkipped = _dir + "[__skipped]\\";
+	_dirResize  = _dir + myGlobals::aux_dir_resize  + "\\";
+	_dirQuality = _dir + myGlobals::aux_dir_quality + "\\";
+	_dirResized = _dir + myGlobals::aux_dir_resized + "\\";
+	_dirSkipped = _dir + myGlobals::aux_dir_skipped + "\\";
 
 	return;
 }
@@ -511,9 +568,9 @@ bool myApp::ren(std::string oldName, std::string newName, std::string &newFullNa
 		BOOL b = MoveFileA(oldName.c_str(), newFullName.c_str());
 
 		logData += oldName;
-        logData += ren_to;
+        logData += myGlobals::ren_to;
 		logData += newFullName.substr(newFullName.find_last_of('\\') + 1u, newFullName.length());
-		logData += b ? ren_ok : ren_fail;
+		logData += b ? myGlobals::ren_ok : myGlobals::ren_fail;
 		logData += "\n";
 
 		return b != 0;
@@ -723,7 +780,7 @@ void myApp::readFiles(std::string dir)
 
 	findDirs(dir);
 
-	std::cout << " Found " << _mapDirs.size() << " directories:\n" << std::endl;
+	std::cout << " Found " << _mapDirs.size() << " subfolder(s):\n" << std::endl;
 
 	// For each dir:
 	for (auto iter = _mapDirs.begin(); iter != _mapDirs.end(); ++iter)
@@ -768,6 +825,8 @@ void myApp::readFiles(std::string dir)
 
 void myApp::sortDirs()
 {
+    createAuxDirs(false);
+
 	const size_t THRESHOLD_RESIZE  = 3000;
 	const size_t THRESHOLD_QUALITY = 15;
 
@@ -931,11 +990,11 @@ void myApp::checkOnRenamed()
 	vec.emplace_back(&_dirResize);
 
 	// Read file structure and get files info
-	std::cout << " Reading files..." << std::endl;
-
 	// Upper level directories:
 	for (size_t i = 0; i < vec.size(); i++)
 	{
+        std::cout << " Reading files in " << *vec[i] << std::endl;
+
 		readFiles(*vec[i]);
 
 		// Inner directories
@@ -1005,7 +1064,10 @@ void myApp::checkOnRenamed()
 			// Move files into another directory
 			if (map_not_resized.size() > 4u)
 			{
-				std::string dir = iter->second.fullName + "[-not-resized-]";
+				std::string dir = iter->second.fullName + myGlobals::aux_dir_not_resized;
+                std::string dir_not_resized(myGlobals::aux_dir_not_resized);
+                dir_not_resized += "\\";
+
 				CreateDirectoryA(dir.c_str(), NULL);
 
 				for (auto it = map_not_resized.begin(); it != map_not_resized.end(); ++it)
@@ -1013,15 +1075,13 @@ void myApp::checkOnRenamed()
 					std::string src = it->second;
 					std::string dst = it->second;
 
-					size_t pos = dst.find_last_of('\\') + 1;
-
-					dst.insert(pos, "[-not-resized-]\\");
+					dst.insert(dst.find_last_of('\\') + 1u, dir_not_resized);
 
 					MoveFileExA(src.c_str(), dst.c_str(), MOVEFILE_WRITE_THROUGH);
 				}
 			}
 
-			// Save log info into a file. If the file already exists, it will be replaced
+			// Save log info into a file. If the file already exists, it will be overwritten
 			std::fstream file;
 			file.open(iter->second.fullName + "\\[info].txt", std::fstream::out);
 
@@ -1083,9 +1143,9 @@ void myApp::restoreFileNames()
         if (!parseOk)
         {
             std::cout << " Parsing '[info].txt' failed" << std::endl;
-            std::cout << tab_of_four << "Possible reasons:" << std::endl;
-            std::cout << tab_of_four << " - One of the lines in the file has status 'Fail'" << std::endl;
-            std::cout << tab_of_four << " - Incorrect syntax within one of the lines" << std::endl;
+            std::cout << myGlobals::tab_of_four << "Possible reasons:" << std::endl;
+            std::cout << myGlobals::tab_of_four << " - One of the lines in the file has status 'Fail'" << std::endl;
+            std::cout << myGlobals::tab_of_four << " - Incorrect syntax within one of the lines" << std::endl;
             std::cout << std::endl;
         }
         else
@@ -1093,11 +1153,11 @@ void myApp::restoreFileNames()
             std::cout << " Parsing results:\n";
 
             for (auto m : m1)
-                std::cout << tab_of_four << "[" << m.first << "] => [" << m.second << "]" << std::endl;
+                std::cout << myGlobals::tab_of_four << "[" << m.first << "] => [" << m.second << "]" << std::endl;
 
             std::cout << "\n";
             for (auto m : m2)
-                std::cout << tab_of_four << "[" << m.first << "] => [" << m.second << "]" << std::endl;
+                std::cout << myGlobals::tab_of_four << "[" << m.first << "] => [" << m.second << "]" << std::endl;
 
             std::cout << "\n Renaming files:\n";
 
@@ -1155,26 +1215,26 @@ int myApp::rstr_CheckFileStructure(std::vector<std::string> &vec)
     {
         std::string dir = getUpperLevelDirectory(path, i);
 
-        if (dirExists(dir, true))
+        if (dirExists(dir))
         {
             std::string info = dir + "[info].txt";
 
             if (fileExists(info))
             {
-                std::cout << tab_of_four << "[info].txt is found in '" << dir << "'" << std::endl;
+                std::cout << myGlobals::tab_of_four << "[info].txt is found in '" << dir << "'" << std::endl;
 
                 if (rstr_GetHistory(vec, info))
                 {
-                    std::cout << tab_of_four << "[info].txt contains some records in it" << std::endl;
+                    std::cout << myGlobals::tab_of_four << "[info].txt contains some records in it" << std::endl;
 
                     if (check_vec(vec))
                     {
-                        std::cout << tab_of_four << "[info].txt records look good" << std::endl;
+                        std::cout << myGlobals::tab_of_four << "[info].txt records look good" << std::endl;
                         return 1;
                     }
                     else
                     {
-                        std::cout << tab_of_four << "[info].txt records refer to more than one distinct directory" << std::endl;
+                        std::cout << myGlobals::tab_of_four << "[info].txt records refer to more than one distinct directory" << std::endl;
                     }
                 }
             }
@@ -1183,10 +1243,10 @@ int myApp::rstr_CheckFileStructure(std::vector<std::string> &vec)
             {
                 std::string curr = getCurrentDirFromPath(dir);
 
-                bool isAUX = curr == "[__do_resize]"        || 
-                             curr == "[__skipped]"          ||
-                             curr == "[__do_lower_quality]" ||
-                             curr == "[__files.r]";
+                bool isAUX = curr == myGlobals::aux_dir_quality ||
+                             curr == myGlobals::aux_dir_resize  ||
+                             curr == myGlobals::aux_dir_resized ||
+                             curr == myGlobals::aux_dir_skipped;
                 if(!isAUX)
                     break;
             }
@@ -1256,7 +1316,7 @@ bool myApp::rstr_ParseInfoVec(std::vector<std::string> &vec, std::map<std::strin
     // and performs: map["_tmp_001.jpg"] = "C:\test\dir\file.jpg"
     auto parse_line = [](std::map<std::string, std::string> &map, const std::string *str) -> bool
     {
-        size_t pos = str->find(ren_to);
+        size_t pos = str->find(myGlobals::ren_to);
 
         if (pos != std::string::npos)
         {
@@ -1264,7 +1324,7 @@ bool myApp::rstr_ParseInfoVec(std::vector<std::string> &vec, std::map<std::strin
             std::string key = str->substr(pos + 4u, str->length());     // '_tmp_001.jpg  -- Ok'
 
             val = val.substr(val.find_last_of('\\') + 1u, val.length());
-            key = key.substr(0u, key.find(ren_ok));
+            key = key.substr(0u, key.find(myGlobals::ren_ok));
 
             map[key] = val;
             return true;
@@ -1285,7 +1345,7 @@ bool myApp::rstr_ParseInfoVec(std::vector<std::string> &vec, std::map<std::strin
         const char* s = str->c_str() + str->length() - 5u;
 
         // One of the lines does not end with "-- Ok"
-        if (strcmp(s, ren_ok + 2u) != 0)
+        if (strcmp(s, myGlobals::ren_ok + 2u) != 0)
             return false;
 
         if (str->find("=> _tmp_") != std::string::npos)
@@ -1316,7 +1376,7 @@ bool myApp::rstr_Rename(std::map<std::string, std::string> &m1, std::map<std::st
             std::string oldName = dir + iter->first;
             std::string newName = dir + iter->second;
 
-            std::cout << tab_of_four << oldName << " => " << newName << ":\n" << tab_of_four << tab_of_four << "Status: ";
+            std::cout << myGlobals::tab_of_four << oldName << " => " << newName << ":\n" << myGlobals::tab_of_four << myGlobals::tab_of_four << "Status: ";
 
             if (!fileExists(oldName))
             {
@@ -1403,6 +1463,22 @@ std::string myApp::getCurrentDirFromPath(const std::string &path) const
         pos--;
 
     return path.substr(pos, len - pos - cnt);
+}
+
+// -----------------------------------------------------------------------------------------------
+
+void myApp::logError(const std::string &str)
+{
+    std::fstream file;
+
+    file.open(_dir + "error.log", std::ios::app);
+
+    if (file.is_open())
+    {
+        file.write(str.c_str(), str.length());
+        file.write("\n", 1u);
+        file.close();
+    }
 }
 
 // -----------------------------------------------------------------------------------------------

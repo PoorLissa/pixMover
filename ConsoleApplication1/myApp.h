@@ -137,7 +137,7 @@ static  void extractPath(int argc, char** argv, std::string& path)
         void	findDirs        (std::string);
         void	findFiles       (std::string, dirInfo &);
         bool	GetImageSize    (const char*, int&, int&);
-        bool	dirExists       (std::string, bool = false);
+        bool	dirExists       (std::string);
         bool	fileExists      (std::string);
         void	mkDir           (std::string);
         void	mvDir           (std::string, std::string, enum DIRS);
@@ -147,6 +147,7 @@ static  void extractPath(int argc, char** argv, std::string& path)
         void    sortDirs        ();
         void    checkOnRenamed  ();
         void    restoreFileNames();
+        void    logError        (const std::string &);
 
         int     rstr_CheckFileStructure     (std::vector<std::string> &);
         bool    rstr_GetHistory             (std::vector<std::string> &, std::string &);
