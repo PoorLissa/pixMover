@@ -114,10 +114,6 @@ void myApp::process()
 			std::cout << "Exiting" << std::endl;
 	}
 
-	std::cout << " Press any key to contiunue : " << std::endl;
-
-	getchar();
-
 	return;
 }
 
@@ -143,7 +139,7 @@ void myApp::findDirs(std::string dir)
 	};
 
 	WIN32_FIND_DATA ffd;
-	TCHAR szDir[MAX_PATH];
+    TCHAR szDir[MAX_PATH] = { 0 };
 	HANDLE hFind = INVALID_HANDLE_VALUE;
 
 	bool error(false);
@@ -203,13 +199,12 @@ void myApp::findDirs(std::string dir)
 // -----------------------------------------------------------------------------------------------
 
 // Get list of files within the directory
-// Return total size of all files found
 void myApp::findFiles(std::string dir, dirInfo &di)
 {
 	const char* validExtensions[] = { ".jpg", ".jpeg" };
 
 	WIN32_FIND_DATA ffd;
-	TCHAR szDir[MAX_PATH];
+    TCHAR szDir[MAX_PATH] = { 0 };
 	HANDLE hFind = INVALID_HANDLE_VALUE;
 
 	bool error(false);
@@ -281,7 +276,7 @@ void myApp::findFiles(std::string dir, dirInfo &di)
 					// Get data associated with "crt_stat.c":
 					if (_stat32(fullName.c_str(), &buf))
 					{
-						size = 0;
+						size = 0u;
 					}
 					else
 					{
@@ -460,7 +455,7 @@ void myApp::mkDir(std::string dir)
 
 // -----------------------------------------------------------------------------------------------
 
-void myApp::mvDir(std::string shortName, std::string fullName, enum DIRS d)
+void myApp::mvDir(std::string shortName, std::string fullName, enum class DIRS d)
 {
 	std::string dest(_dir);
 
@@ -485,9 +480,11 @@ void myApp::mvDir(std::string shortName, std::string fullName, enum DIRS d)
 			break;
 	}
 
-    if (bits[d] == 0)
+    int D = static_cast<int>(d);
+
+    if (bits[D] == 0)
     {
-        bits[d] = 1;
+        bits[D] = 1;
 
         if (!dirExists(dest))
         {
@@ -561,7 +558,7 @@ bool myApp::ren(std::string oldName, std::string newName, std::string &newFullNa
 
 	if (oldName != newFullName)
 	{
-		//			std::cout << " ren '" << oldName << "' to '" << newFullName << "'" << std::endl;
+//		std::cout << " ren '" << oldName << "' to '" << newFullName << "'" << std::endl;
 
 		BOOL b = MoveFileA(oldName.c_str(), newFullName.c_str());
 
@@ -643,16 +640,18 @@ void myApp::renFiles(dirInfo &di, bool doRenameCovers, bool doRenameFiles, std::
 	bool			resizedFound = false;
 	std::string		newFullName;
 	size_t			cnt_cover(0u), cnt_z_cover(0u), cnt(0u), totalSize(0u);
-	const char *	d	 = "==========================================================================================\n";
+	const char *	d = "==========================================================================================\n";
 
 	// Skip any folder that has subfolders
 	if (di.mode == 1)
 		return;
 
-	// Try to find out if any of the files were resized already:
+	// Try to find out if any of the files were resized already
+    // Also, gather some additional statistics
 	for (auto it = di.files.begin(); it != di.files.end(); ++it)
 	{
-		totalSize += it->second.size;
+        // For the avg. file size
+		totalSize  += it->second.size;
 
 		if (it->second.isResized)
 			resizedFound = true;
@@ -664,7 +663,7 @@ void myApp::renFiles(dirInfo &di, bool doRenameCovers, bool doRenameFiles, std::
 
 	logData += d;
 
-	// Try to find covers first:
+	// Try to find covers by name first:
 	for (auto it = di.files.begin(); it != di.files.end(); ++it)
 	{
 		if (it->second.canRename)
@@ -707,29 +706,50 @@ void myApp::renFiles(dirInfo &di, bool doRenameCovers, bool doRenameFiles, std::
 		}
 	}
 
-	// No cover files were found
-	// Try to find files that are significantly smaller than average file size in this dir:
-	if (cnt_cover + cnt_z_cover == 0u)
-	{
-		float avg = (float)totalSize / di.files.size();
+    // Try to find files that are significantly smaller (with respect to file dimensions)
+    for (auto it = di.files.begin(); it != di.files.end(); ++it)
+    {
+        if (it->second.canRename)
+        {
+            int w = it->second.width > it->second.height ? it->second.width  : it->second.height;
+            int h = it->second.width > it->second.height ? it->second.height : it->second.width;
 
-		for (auto it = di.files.begin(); it != di.files.end(); ++it)
-		{
-			if (it->second.canRename)
-			{
-				// 8 is just a guess here
-				if (avg / it->second.size > 8)
-				{
-					if (doRenameCovers)
-					{
-						ren(it->second.fullName, "_cover;" + it->first, newFullName, logData, 0u, false);
-						it->second.canRename = false;
-						cnt_cover++;
-					}
-				}
-			}
-		}
-	}
+            // File's max dimension has to be less than [_threshold_cover]
+            if (_threshold_cover > 0u && w <= _threshold_cover)
+            {
+                // File's dimensions have to be less than average dimension in this folder
+                if (di.avg_height / h > _threshold_dimension && di.avg_width / w > _threshold_dimension)
+                {
+                    if (doRenameCovers)
+                    {
+//                      std::cout << it->first << " [" << w << "x" << h << "]" << std::endl;
+
+                        // ren 'aaa.jpg' to '_cover;dimension;aaa.jpg'
+                        ren(it->second.fullName, "_cover;dimension;" + it->first, newFullName, logData, 0u, false);
+                        it->second.canRename = false;
+                        cnt_cover++;
+                    }
+                }
+            }
+        }
+    }
+
+    // Try to find files that are significantly smaller (with respect to file size)
+    for (auto it = di.files.begin(); it != di.files.end(); ++it)
+    {
+        if (it->second.canRename)
+        {
+            if (di.avg_size / it->second.size > _threshold_size)
+            {
+                if (doRenameCovers)
+                {
+                    ren(it->second.fullName, "_cover;size;" + it->first, newFullName, logData, 0u, false);
+                    it->second.canRename = false;
+                    cnt_cover++;
+                }
+            }
+        }
+    }
 
 	// Rename the rest of the files:
 	{
@@ -773,8 +793,7 @@ void myApp::renFiles(dirInfo &di, bool doRenameCovers, bool doRenameFiles, std::
 // Read info about all the files into map
 void myApp::readFiles(std::string dir)
 {
-	int		x(0), y(0);
-	size_t	i(0u);
+	int x(0), y(0), i(0);
 
 	findDirs(dir);
 
@@ -783,7 +802,9 @@ void myApp::readFiles(std::string dir)
 	// For each dir:
 	for (auto iter = _mapDirs.begin(); iter != _mapDirs.end(); ++iter)
 	{
-		std::cout << "   " << ++i << ": " << iter->second.fullName << std::endl;
+        size_t totalSize(0u), totalWidth(0u), totalHeight(0u);
+
+        std::cout << myGlobals::tab_of_four << ++i << ": " << iter->second.fullName << std::endl;
 
 		// Get all files in this directory
 		findFiles(iter->second.fullName, iter->second);
@@ -792,16 +813,38 @@ void myApp::readFiles(std::string dir)
 		{
 			case 0: {
 
+                    std::cout << "\t--> Contains " << iter->second.files.size() << " file(s)" << std::endl;
+
 					// For each file:
 					for (auto it = iter->second.files.begin(); it != iter->second.files.end(); ++it)
 					{
 						GetImageSize(it->second.fullName.c_str(), x, y);
 
-						it->second.width = x;
+						it->second.width  = x;
 						it->second.height = y;
+
+                        // For the avg. file size and dimensions
+                        totalSize   += it->second.size;
+                        totalWidth  += x > y ? x : y;
+                        totalHeight += x > y ? y : x;
+
+#if defined _DEBUG
+                        std::cout << myGlobals::tab_of_four << myGlobals::tab_of_four << it->first << " [" << x << "x" << y << "]" << std::endl;
+#endif
 					}
 
-					std::cout << "\t--> Found " << iter->second.files.size() << " files" << std::endl;
+                    if (iter->second.files.size())
+                    {
+                        iter->second.avg_size   = float(totalSize  ) / iter->second.files.size();
+                        iter->second.avg_width  = float(totalWidth ) / iter->second.files.size();
+                        iter->second.avg_height = float(totalHeight) / iter->second.files.size();
+                    }
+
+#if defined _DEBUG
+                    std::cout << myGlobals::tab_of_four << myGlobals::tab_of_four << " --> avg.size   = " << iter->second.avg_size   << std::endl;
+                    std::cout << myGlobals::tab_of_four << myGlobals::tab_of_four << " --> avg.width  = " << iter->second.avg_width  << std::endl;
+                    std::cout << myGlobals::tab_of_four << myGlobals::tab_of_four << " --> avg.height = " << iter->second.avg_height << std::endl;
+#endif
 				}
 				break;
 
@@ -824,9 +867,6 @@ void myApp::readFiles(std::string dir)
 void myApp::sortDirs()
 {
     createAuxDirs(false);
-
-	const size_t THRESHOLD_RESIZE  = 3000;
-	const size_t THRESHOLD_QUALITY = 15;
 
 	// For each dir:
 	for (auto iter = _mapDirs.begin(); iter != _mapDirs.end(); ++iter)
@@ -875,7 +915,7 @@ void myApp::sortDirs()
 
 					int minSize = x > y ? y : x;
 
-					if (minSize > THRESHOLD_RESIZE)
+					if (minSize > _threshold_resize)
 					{
 						SizeResize += *currentSize;
 						cntResize++;
@@ -889,42 +929,42 @@ void myApp::sortDirs()
 				doSkip = true;
 		}
 
-		std::cout << "\n    Total Files (" << mapFiles->size() << "):" << std::endl;
+		std::cout << "\n" << myGlobals::tab_of_four << "Total Files (" << mapFiles->size() << "):" << std::endl;
 
 		if (mapFiles->size())
 		{
 			float totalSize = (float)SizeTotal / (1024 * 1024);
 			float avgSize = totalSize / mapFiles->size();
 
-			std::cout << "    Total File Size = " << totalSize << " Mb (" << SizeTotal << ") bytes" << std::endl;
-			std::cout << "    Avrg. File Size = " << avgSize << " Mb (" << SizeTotal / mapFiles->size() << ") bytes" << std::endl;
+			std::cout << myGlobals::tab_of_four << "Total File Size = " << totalSize << " Mb (" << SizeTotal << ") bytes" << std::endl;
+			std::cout << myGlobals::tab_of_four << "Avrg. File Size = " << avgSize << " Mb (" << SizeTotal / mapFiles->size() << ") bytes" << std::endl;
 		}
 
-		std::cout << "\n    Files to Resize (" << cntResize << "):" << std::endl;
+		std::cout << "\n" << myGlobals::tab_of_four << "Files to Resize (" << cntResize << "):" << std::endl;
 
 		if (cntResize)
 		{
 			float totalSize = (float)SizeResize / (1024 * 1024);
 			float avgSize = totalSize / cntResize;
 
-			std::cout << "    Total File Size = " << totalSize << " Mb (" << SizeResize << ") bytes" << std::endl;
-			std::cout << "    Avrg. File Size = " << avgSize << " Mb (" << SizeResize / cntResize << ") bytes" << std::endl;
+			std::cout << myGlobals::tab_of_four << "Total File Size = " << totalSize << " Mb (" << SizeResize << ") bytes" << std::endl;
+			std::cout << myGlobals::tab_of_four << "Avrg. File Size = " << avgSize << " Mb (" << SizeResize / cntResize << ") bytes" << std::endl;
 		}
 
-		std::cout << "\n    Files Over 1 Mb (" << cntQuality << "):" << std::endl;
+		std::cout << "\n "<< myGlobals::tab_of_four << "Files Over 1 Mb (" << cntQuality << "):" << std::endl;
 
 		if (cntQuality)
 		{
 			float totalSize = (float)SizeQuality / (1024 * 1024);
 			avg = totalSize / cntQuality;
 
-			std::cout << "    Total File Size = " << totalSize << " Mb (" << SizeQuality << ") bytes" << std::endl;
-			std::cout << "    Avrg. File Size = " << avg << " Mb (" << SizeQuality / cntQuality << ") bytes" << std::endl;
+			std::cout << myGlobals::tab_of_four << "Total File Size = " << totalSize << " Mb (" << SizeQuality << ") bytes" << std::endl;
+			std::cout << myGlobals::tab_of_four << "Avrg. File Size = " << avg << " Mb (" << SizeQuality / cntQuality << ") bytes" << std::endl;
 		}
 
 		if (doSkip)
 		{
-			std::cout << "    Folder will be skipped" << std::endl;
+			std::cout << myGlobals::tab_of_four << "Folder will be skipped" << std::endl;
 		}
 
 		std::cout << std::endl;
@@ -949,7 +989,7 @@ void myApp::sortDirs()
 				break;
 			}
 
-			if (avg * 10 > THRESHOLD_QUALITY)
+			if (avg > _threshold_quality)
 			{
 				mvDir(iter->first, iter->second.fullName, myApp::DIRS::QUALITY);
 				break;
@@ -1091,7 +1131,7 @@ void myApp::checkOnRenamed()
 		}
 	}
 
-	getchar();
+	(void)getchar();
 
 	return;
 }

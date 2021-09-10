@@ -79,6 +79,10 @@ class myApp
 
 		struct fileInfo
 		{
+            fileInfo() : fullName(), size(0u), canRename(false), isResized(false), width(0), height(0)
+            {
+            }
+
 			std::string fullName;
 			size_t		size;
             bool        canRename;
@@ -89,25 +93,38 @@ class myApp
 
         struct dirInfo
         {
+            dirInfo() : mode(0), fullName(), avg_size(0.0f), avg_width(0.0f), avg_height(0.0f)
+            {
+            }
+
             std::string                                     fullName;
             std::map<std::string, myApp::fileInfo, myCmp>   files;
             char                                            mode;
+            float                                           avg_size;
+            float                                           avg_width;
+            float                                           avg_height;
         };
 
 	
-		enum DIRS { RESIZE, QUALITY, RESIZED, SKIPPED };
-        enum MODE { EXIT, REARRANGE, ANALYZE, RESTORE };
+		enum class DIRS { RESIZE, QUALITY, RESIZED, SKIPPED };
+        enum       MODE { EXIT, REARRANGE, ANALYZE, RESTORE };
 
 	public:
 
-		myApp(const char* dir) : _dir(dir), _mode(MODE::EXIT)
+		myApp(const char* dir, float th_dim, float th_size, float th_qlty, size_t th_res, size_t th_cvr)
+            : _dir(dir),
+              _mode(MODE::EXIT),
+              _threshold_dimension(th_dim),
+              _threshold_size(th_size),
+              _threshold_quality(th_qlty),
+              _threshold_resize(th_res),
+              _threshold_cover(th_cvr)
 		{
 			if (_dir.back() != '\\')
 				_dir += "\\";
 
             std::cout << " myApp::myApp has started" << std::endl;
-            std::cout << " Current path is: " << _dir << std::endl;
-            std::cout << std::endl;
+            std::cout << " Current path is: " << _dir << "\n" << std::endl;
 		}
 
         void process();
@@ -140,7 +157,7 @@ static  void extractPath(int argc, char** argv, std::string& path)
         bool	dirExists       (std::string);
         bool	fileExists      (std::string);
         void	mkDir           (std::string);
-        void	mvDir           (std::string, std::string, enum DIRS);
+        void	mvDir           (std::string, std::string, enum class DIRS);
         void    readFiles       (std::string);
         void    renameFiles     ();
         void    renFiles        (dirInfo &, bool, bool, std::string &);
@@ -171,4 +188,10 @@ static  void extractPath(int argc, char** argv, std::string& path)
         std::string _dirSkipped;
 
         std::map<std::string, dirInfo> _mapDirs;
+
+        float  _threshold_dimension;
+        float  _threshold_size;
+        float  _threshold_quality;
+        size_t _threshold_resize;
+        size_t _threshold_cover;
 };

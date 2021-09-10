@@ -18,8 +18,18 @@ int main(int argc, char** argv)
 
     if (!path.empty() && myApp::pathValid(path))
     {
-        myApp app(path.c_str());
+        float   threshold_dimension = 1.4f;
+        float   threshold_size      = 8.0f;
+        float   threshold_quality   = 1.5f;
+        size_t  threshold_resize    = 3000u;
+        size_t  threshold_cover     = 1280u;
+
+        myApp app(path.c_str(), threshold_dimension, threshold_size, threshold_quality, threshold_resize, threshold_cover);
+
         app.process();
+
+        std::cout << " Press any key to exit : " << std::endl;
+        std::ignore = getchar();
     }
     else
     {
@@ -28,7 +38,7 @@ int main(int argc, char** argv)
     }
 
 #if defined _DEBUG
-    getchar();
+    std::ignore = getchar();
 #endif
 
     return 0;
