@@ -663,9 +663,10 @@ void myApp::renFiles(dirInfo &di, bool doRenameCovers, bool doRenameFiles, std::
 
 	logData += d;
 
-	// Try to find covers by name first:
+	// Try to find covers:
 	for (auto it = di.files.begin(); it != di.files.end(); ++it)
 	{
+        // Try to find covers by name:
 		if (it->second.canRename)
 		{
 			std::string name = toLower(it->first);
@@ -700,58 +701,53 @@ void myApp::renFiles(dirInfo &di, bool doRenameCovers, bool doRenameFiles, std::
 					{
 						ren(it->second.fullName, "_cover", newFullName, logData, cnt_cover);
 						cnt_cover++;
+                        continue;
 					}
 				}
 			}
 		}
-	}
 
-    // Try to find files that are significantly smaller (with respect to file dimensions)
-    for (auto it = di.files.begin(); it != di.files.end(); ++it)
-    {
-        if (it->second.canRename)
+        // Try to find files that might be possible covers:
+        if (doRenameCovers)
         {
-            int w = it->second.width > it->second.height ? it->second.width  : it->second.height;
-            int h = it->second.width > it->second.height ? it->second.height : it->second.width;
-
-            // File's max dimension has to be less than [_threshold_cover]
-            if (_threshold_cover > 0u && w <= _threshold_cover)
+            // Try to find files that are significantly smaller (with respect to file dimensions)
+            if (it->second.canRename)
             {
-                // File's dimensions have to be less than average dimension in this folder
-                if (di.avg_height / h > _threshold_dimension && di.avg_width / w > _threshold_dimension)
+                int w = it->second.width > it->second.height ? it->second.width : it->second.height;
+                int h = it->second.width > it->second.height ? it->second.height : it->second.width;
+
+                // File's max dimension has to be less than [_threshold_cover]
+                if (_threshold_cover > 0u && w <= _threshold_cover)
                 {
-                    if (doRenameCovers)
+                    // File's dimensions have to be less than average dimension in this folder
+                    if (di.avg_height / h > _threshold_dimension && di.avg_width / w > _threshold_dimension)
                     {
 //                      std::cout << it->first << " [" << w << "x" << h << "]" << std::endl;
 
-                        // ren 'aaa.jpg' to '_cover;dimension;aaa.jpg'
+                        // Rename 'aaa.jpg' => '_cover;dimension;aaa.jpg'
                         ren(it->second.fullName, "_cover;dimension;" + it->first, newFullName, logData, 0u, false);
                         it->second.canRename = false;
                         cnt_cover++;
                     }
                 }
             }
-        }
-    }
 
-    // Try to find files that are significantly smaller (with respect to file size)
-    for (auto it = di.files.begin(); it != di.files.end(); ++it)
-    {
-        if (it->second.canRename)
-        {
-            if (di.avg_size / it->second.size > _threshold_size)
+            // Try to find files that are significantly smaller (with respect to file size)
+            if (it->second.canRename)
             {
-                if (doRenameCovers)
+                if (di.avg_size / it->second.size > _threshold_size)
                 {
+                    // Rename 'aaa.jpg' => '_cover;size;aaa.jpg'
                     ren(it->second.fullName, "_cover;size;" + it->first, newFullName, logData, 0u, false);
                     it->second.canRename = false;
                     cnt_cover++;
                 }
             }
         }
-    }
+	}
 
 	// Rename the rest of the files:
+    if (doRenameFiles)
 	{
 		std::vector<std::string> vec;
 
@@ -764,15 +760,12 @@ void myApp::renFiles(dirInfo &di, bool doRenameCovers, bool doRenameFiles, std::
 		{
 			if (it->second.canRename && !it->second.isResized)
 			{
-				if (doRenameFiles)
-				{
-					std::string tmpName("_tmp_" + getNumericName(++cnt, totalCnt));
+                std::string tmpName("_tmp_" + getNumericName(++cnt, totalCnt));
 
-					ren(it->second.fullName, tmpName, newFullName, logData);
-					it->second.canRename = false;
+				ren(it->second.fullName, tmpName, newFullName, logData);
+				it->second.canRename = false;
 
-					vec.push_back(newFullName);
-				}
+				vec.push_back(newFullName);
 			}
 		}
 
