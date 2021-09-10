@@ -133,6 +133,15 @@ void myApp::findDirs(std::string dir)
                                         myGlobals::aux_dir_skipped
     };
 
+	auto isDirOk = [&names_to_skip](const std::string &name) -> bool
+	{
+		for (size_t i = 0; i < sizeof(names_to_skip) / sizeof(names_to_skip[0]); i++)
+			if (name == names_to_skip[i])
+				return false;
+
+		return true;
+	};
+
 	WIN32_FIND_DATA ffd;
 	TCHAR szDir[MAX_PATH];
 	HANDLE hFind = INVALID_HANDLE_VALUE;
@@ -169,19 +178,8 @@ void myApp::findDirs(std::string dir)
 
 				fullName += "\\";
 
-                bool isOk = true;
-
-                for (size_t i = 0; i < sizeof(names_to_skip) / sizeof(names_to_skip[0]); i++)
-                {
-                    if (name == names_to_skip[i])
-                    {
-                        isOk = false;
-                        break;
-                    }
-                }
-
 				// Remember the name
-                if (isOk)
+                if (isDirOk(name))
 				{
 					if (fullName != _dirQuality && fullName != _dirResize)
 					{
