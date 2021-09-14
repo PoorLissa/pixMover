@@ -5,6 +5,7 @@
 #include <windows.h>
 #include <string>
 #include <vector>
+#include <list>
 #include <map>
 #include <fstream>
 
@@ -93,7 +94,7 @@ class myApp
 
         struct dirInfo
         {
-            dirInfo() : mode(0), fullName(), avg_size(0.0f), avg_width(0.0f), avg_height(0.0f)
+            dirInfo() : mode(0), fullName(), avg_size(0.0f), avg_width(0.0f), avg_height(0.0f), median_size(0u), median_width(0), median_height(0)
             {
             }
 
@@ -103,6 +104,9 @@ class myApp
             float                                           avg_size;
             float                                           avg_width;
             float                                           avg_height;
+            size_t                                          median_size;
+            int                                             median_width;
+            int                                             median_height;
         };
 
 	

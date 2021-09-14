@@ -707,16 +707,18 @@ void myApp::renFiles(dirInfo &di, bool doRenameCovers, bool doRenameFiles, std::
 			}
 		}
 
-        // Try to find files that might be possible covers:
+        // Try to find files that possibly might be covers:
         if (doRenameCovers)
         {
             // Try to find files that are significantly smaller (with respect to file dimensions)
             if (it->second.canRename)
             {
-                int w = it->second.width > it->second.height ? it->second.width : it->second.height;
+                int w = it->second.width > it->second.height ? it->second.width  : it->second.height;
                 int h = it->second.width > it->second.height ? it->second.height : it->second.width;
 
                 // File's max dimension has to be less than [_threshold_cover]
+#if 1
+                // Average
                 if (_threshold_cover > 0u && w <= _threshold_cover)
                 {
                     // File's dimensions have to be less than average dimension in this folder
@@ -730,6 +732,22 @@ void myApp::renFiles(dirInfo &di, bool doRenameCovers, bool doRenameFiles, std::
                         cnt_cover++;
                     }
                 }
+#else
+                // Median
+                if (_threshold_cover > 0u && w <= _threshold_cover)
+                {
+                    // File's dimensions have to be less than median dimension in this folder
+                    if (di.median_height / h > _threshold_dimension || di.median_width / w > _threshold_dimension)
+                    {
+//                      std::cout << it->first << " [" << w << "x" << h << "]" << std::endl;
+
+                        // Rename 'aaa.jpg' => '_cover;dimension;aaa.jpg'
+                        ren(it->second.fullName, "_cover;dimension;" + it->first, newFullName, logData, 0u, false);
+                        it->second.canRename = false;
+                        cnt_cover++;
+                    }
+                }
+#endif
             }
 
             // Try to find files that are significantly smaller (with respect to file size)
@@ -808,6 +826,10 @@ void myApp::readFiles(std::string dir)
 
                     std::cout << "\t--> Contains " << iter->second.files.size() << " file(s)" << std::endl;
 
+                    // We'll use lists to get median values
+                    std::list<size_t>   l1;
+                    std::list<int>      l2, l3;
+
 					// For each file:
 					for (auto it = iter->second.files.begin(); it != iter->second.files.end(); ++it)
 					{
@@ -821,8 +843,12 @@ void myApp::readFiles(std::string dir)
                         totalWidth  += x > y ? x : y;
                         totalHeight += x > y ? y : x;
 
+                        l1.emplace_back(it->second.size);
+                        l2.emplace_back(x > y ? x : y);
+                        l3.emplace_back(x > y ? y : x);
+
 #if defined _DEBUG
-                        std::cout << myGlobals::tab_of_four << myGlobals::tab_of_four << it->first << " [" << x << "x" << y << "]" << std::endl;
+                        std::cout << myGlobals::tab_of_four << myGlobals::tab_of_four << myGlobals::tab_of_four << it->first << " [" << x << "x" << y << "]" << std::endl;
 #endif
 					}
 
@@ -831,12 +857,35 @@ void myApp::readFiles(std::string dir)
                         iter->second.avg_size   = float(totalSize  ) / iter->second.files.size();
                         iter->second.avg_width  = float(totalWidth ) / iter->second.files.size();
                         iter->second.avg_height = float(totalHeight) / iter->second.files.size();
+
+                        // Get median values
+                        {
+                            l1.sort();
+                            l2.sort();
+                            l3.sort();
+
+                            auto it1 = l1.begin();
+                            auto it2 = l2.begin();
+                            auto it3 = l3.begin();
+
+                            for (size_t i = 0; i < l1.size() / 2u; i++)
+                            {
+                                ++it1;
+                                ++it2;
+                                ++it3;
+                            }
+
+                            iter->second.median_size   = *it1;
+                            iter->second.median_width  = *it2;
+                            iter->second.median_height = *it3;
+                        }
                     }
 
 #if defined _DEBUG
-                    std::cout << myGlobals::tab_of_four << myGlobals::tab_of_four << " --> avg.size   = " << iter->second.avg_size   << std::endl;
-                    std::cout << myGlobals::tab_of_four << myGlobals::tab_of_four << " --> avg.width  = " << iter->second.avg_width  << std::endl;
-                    std::cout << myGlobals::tab_of_four << myGlobals::tab_of_four << " --> avg.height = " << iter->second.avg_height << std::endl;
+                    std::cout << myGlobals::tab_of_four << myGlobals::tab_of_four << " --> size   : " << iter->second.avg_size   << " (avg), " << iter->second.median_size   << " (median)" << std::endl;
+                    std::cout << myGlobals::tab_of_four << myGlobals::tab_of_four << " --> width  : " << iter->second.avg_width  << " (avg), " << iter->second.median_width  << " (median)" << std::endl;
+                    std::cout << myGlobals::tab_of_four << myGlobals::tab_of_four << " --> height : " << iter->second.avg_height << " (avg), " << iter->second.median_height << " (median)" << std::endl;
+                    std::cout << std::endl;
 #endif
 				}
 				break;
