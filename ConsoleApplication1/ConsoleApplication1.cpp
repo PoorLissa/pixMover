@@ -10,10 +10,10 @@ int main(int argc, char** argv)
 
 #if defined _DEBUG
     path = "D:\\test\\[__do_resize]\\ViksiQ - Release";
-    path = "d:\\test";
     path = "C:\\_maxx\\test\\001";
     path = "C:\\_maxx\\test\\[__do_resize]\\001";
     path = "C:\\_maxx\\test";
+    path = "d:\\test";
 #endif
 
     if (!path.empty() && myApp::pathValid(path))
@@ -22,7 +22,7 @@ int main(int argc, char** argv)
         float   threshold_size      = 8.0f;
         float   threshold_quality   = 1.5f;
         size_t  threshold_resize    = 3000u;
-        size_t  threshold_cover     = 1280u;
+        size_t  threshold_cover     = 1600u;
 
         myApp app(path.c_str(), threshold_dimension, threshold_size, threshold_quality, threshold_resize, threshold_cover);
 

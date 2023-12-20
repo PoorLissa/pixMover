@@ -717,7 +717,7 @@ void myApp::renFiles(dirInfo &di, bool doRenameCovers, bool doRenameFiles, std::
                 int h = it->second.width > it->second.height ? it->second.height : it->second.width;
 
                 // File's max dimension has to be less than [_threshold_cover]
-#if 1
+#if 0
                 // Average
                 if (_threshold_cover > 0u && w <= _threshold_cover)
                 {
@@ -727,7 +727,7 @@ void myApp::renFiles(dirInfo &di, bool doRenameCovers, bool doRenameFiles, std::
 //                      std::cout << it->first << " [" << w << "x" << h << "]" << std::endl;
 
                         // Rename 'aaa.jpg' => '_cover;dimension;aaa.jpg'
-                        ren(it->second.fullName, "_cover;dimension;" + it->first, newFullName, logData, 0u, false);
+                        ren(it->second.fullName, "_cover;dimension.avg;" + it->first, newFullName, logData, 0u, false);
                         it->second.canRename = false;
                         cnt_cover++;
                     }
@@ -742,7 +742,7 @@ void myApp::renFiles(dirInfo &di, bool doRenameCovers, bool doRenameFiles, std::
 //                      std::cout << it->first << " [" << w << "x" << h << "]" << std::endl;
 
                         // Rename 'aaa.jpg' => '_cover;dimension;aaa.jpg'
-                        ren(it->second.fullName, "_cover;dimension;" + it->first, newFullName, logData, 0u, false);
+                        ren(it->second.fullName, "_cover;dimension.mdn;" + it->first, newFullName, logData, 0u, false);
                         it->second.canRename = false;
                         cnt_cover++;
                     }
