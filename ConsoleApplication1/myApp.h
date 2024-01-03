@@ -90,6 +90,7 @@ class myApp
             bool        isResized;
             int         width;
             int         height;
+            int         action;
 		};
 
         struct dirInfo
@@ -162,6 +163,7 @@ static  void extractPath(int argc, char** argv, std::string& path)
         bool	fileExists      (std::string);
         void	mkDir           (std::string);
         void	mvDir           (std::string, std::string, enum class DIRS);
+        void    mvFiles         (std::string, std::string, std::map<std::string, myApp::fileInfo, myCmp> &);
         void    readFiles       (std::string);
         void    renameFiles     ();
         void    renFiles        (dirInfo &, bool, bool, std::string &);

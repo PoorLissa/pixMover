@@ -509,6 +509,86 @@ void myApp::mvDir(std::string shortName, std::string fullName, enum class DIRS d
 
 // -----------------------------------------------------------------------------------------------
 
+// Move files to two separate directories
+void myApp::mvFiles(std::string shortName, std::string fullName, std::map<std::string, myApp::fileInfo, myCmp> &files)
+{
+    std::string dest1(_dirQuality);
+    std::string dest2(_dirResize);
+
+    if (!dirExists(dest1))
+    {
+        std::cout << myGlobals::tab_of_four << "Creating dir : " << dest1 << std::endl;
+        mkDir(dest1);
+    }
+
+    if (!dirExists(dest2))
+    {
+        std::cout << myGlobals::tab_of_four << "Creating dir : " << dest2 << std::endl;
+        mkDir(dest2);
+    }
+
+    for (auto it = files.begin(); it != files.end(); ++it)
+    {
+        std::string src = fullName + it->first, dest = "";
+
+        switch (it->second.action)
+        {
+            case 0:
+                break;
+
+            // Quality
+            case 1:
+                {
+                    dest = dest1 + shortName;
+
+                    if (!dirExists(dest))
+                    {
+                        std::cout << myGlobals::tab_of_four << "Creating dir : " << dest << std::endl;
+                        mkDir(dest);
+                    }
+                    
+                    dest += "\\" + it->first;
+                    BOOL bbb = MoveFileExA(src.c_str(), dest.c_str(), MOVEFILE_WRITE_THROUGH);
+
+                    if (!bbb)
+                    {
+                        std::cout << myGlobals::tab_of_four << "Move func failed. See error log for details." << std::endl;
+                        std::string err = " --> Move failed: " + fullName + " => " + dest;
+                        logError(err);
+                    }
+                }
+                break;
+
+            // Resize
+            case 2:
+                {
+                    dest = dest2 + shortName;
+
+                    if (!dirExists(dest))
+                    {
+                        std::cout << myGlobals::tab_of_four << "Creating dir : " << dest << std::endl;
+                        mkDir(dest);
+                    }
+                    
+                    dest += "\\" + it->first;
+                    BOOL bbb = MoveFileExA(src.c_str(), dest.c_str(), MOVEFILE_WRITE_THROUGH);
+
+                    if (!bbb)
+                    {
+                        std::cout << myGlobals::tab_of_four << "Move func failed. See error log for details." << std::endl;
+                        std::string err = " --> Move failed: " + fullName + " => " + dest;
+                        logError(err);
+                    }
+                }
+                break;
+        }
+    }
+
+    return;
+}
+
+// -----------------------------------------------------------------------------------------------
+
 void myApp::createAuxDirs(bool doCreate)
 {
 	if (doCreate)
@@ -925,6 +1005,8 @@ void myApp::sortDirs()
 			// For each file:
 			for (auto it = mapFiles->begin(); it != mapFiles->end(); ++it)
 			{
+                it->second.action = 0;
+
 				size_t* currentSize = &(it->second.size);
 
 				SizeTotal += *currentSize;
@@ -940,6 +1022,7 @@ void myApp::sortDirs()
 					{
 						SizeQuality += *currentSize;
 						cntQuality++;
+                        it->second.action = 1;
 					}
 
 					x = it->second.width;
@@ -961,6 +1044,7 @@ void myApp::sortDirs()
 					{
 						SizeResize += *currentSize;
 						cntResize++;
+                        it->second.action = 2;
 					}
 				}
 			}
@@ -1013,24 +1097,34 @@ void myApp::sortDirs()
 
 		do
 		{
+            // Skip this folder
 			if (doSkip)
 			{
 				mvDir(iter->first, iter->second.fullName, myApp::DIRS::SKIPPED);
 				break;
 			}
 
+            // Already resized
 			if (cntResized)
 			{
 				mvDir(iter->first, iter->second.fullName, myApp::DIRS::RESIZED);
 				break;
 			}
 
+            if (cntResize && avg > _threshold_quality)
+            {
+                mvFiles(iter->first, iter->second.fullName, *mapFiles);
+                break;
+            }
+
+            // Resize every file
 			if (cntResize)
 			{
 				mvDir(iter->first, iter->second.fullName, myApp::DIRS::RESIZE);
 				break;
 			}
 
+            // Reduce quality for every file
 			if (avg > _threshold_quality)
 			{
 				mvDir(iter->first, iter->second.fullName, myApp::DIRS::QUALITY);
